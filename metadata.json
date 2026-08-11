@@ -1,0 +1,6 @@
+{
+  "name": "UrgentLyfe",
+  "description": "AI-powered home service marketplace platform for India offering instant SOS bookings, smart AI diagnostics, price estimation, and verified professionals across top cities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
