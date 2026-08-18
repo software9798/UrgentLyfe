@@ -105,11 +105,40 @@ export function generateInvoiceHTML(booking: Booking, user?: User | null): strin
         <h3>Booking & Payment Details:</h3>
         <p>Booking ID: <span style="font-family: monospace; color: #2563eb;">#${booking.id}</span></p>
         <div class="subtext">Order Type: <strong>${booking.isUrgent ? '30-Min Priority Emergency SOS' : 'Standard Scheduled Slot'}</strong></div>
-        <div class="subtext">Payment Method: <strong>${booking.paymentMethod || 'UPI / Online'}</strong></div>
-        <div class="subtext">Payment Status: <strong style="color: #10b981;">PAID & VERIFIED</strong></div>
+        <div class="subtext">Service Status: <strong style="color: #10b981;">WORK COMPLETED & DELIVERED ✓</strong></div>
+        <div class="subtext">Payment Method: <strong>${booking.paymentMethod === 'CASH' ? 'Cash On Delivery (COD)' : booking.paymentMethod || 'UPI / Online'}</strong></div>
+        <div class="subtext">Payment Status: <strong style="color: #10b981;">${booking.paymentMethod === 'CASH' ? 'PAID VIA CASH ON DELIVERY' : 'PAID & VERIFIED'}</strong></div>
         <div class="subtext">Technician: <strong>${booking.partner?.name || 'Assigned Certified Partner'}</strong></div>
       </div>
     </div>
+
+    ${booking.paymentMethod === 'CASH' ? `
+    <div style="margin: 0 36px 16px; background: #ecfdf5; border: 1.5px dashed #10b981; border-radius: 12px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="background: #10b981; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold;">✓</span>
+        <div>
+          <p style="font-weight: 800; color: #065f46; font-size: 13px; margin: 0;">Cash on Delivery (COD) Payment Received & Work Delivered</p>
+          <p style="color: #047857; font-size: 11px; margin: 0;">Amount of ₹${booking.totalAmount} collected and verified by technician (${booking.partner?.name || 'Authorized Partner'}).</p>
+        </div>
+      </div>
+      <div style="background: #047857; color: white; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+        PAID IN CASH ✓
+      </div>
+    </div>
+    ` : `
+    <div style="margin: 0 36px 16px; background: #eff6ff; border: 1.5px dashed #3b82f6; border-radius: 12px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="background: #3b82f6; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold;">✓</span>
+        <div>
+          <p style="font-weight: 800; color: #1e40af; font-size: 13px; margin: 0;">Online Payment Verified & Service Completed</p>
+          <p style="color: #1d4ed8; font-size: 11px; margin: 0;">Transaction settled via ${booking.paymentMethod || 'UPI / Card'}. Service fulfilled by ${booking.partner?.name || 'UrgentLyfe Certified Partner'}.</p>
+        </div>
+      </div>
+      <div style="background: #1d4ed8; color: white; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+        COMPLETED & PAID ✓
+      </div>
+    </div>
+    `}
 
     <div class="table-container">
       <table>

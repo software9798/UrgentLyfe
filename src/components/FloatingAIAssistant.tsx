@@ -18,10 +18,10 @@ export const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   const [showTooltip, setShowTooltip] = useState(true);
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2 font-sans animate-fadeIn">
+    <div className="fixed bottom-20 md:bottom-5 right-3 sm:right-5 z-40 flex flex-col items-end gap-2 font-sans animate-fadeIn">
       {/* Eye-catching Tooltip Hint (Visible before first click) */}
       {showTooltip && !isOpen && (
-        <div className="bg-slate-900/95 text-white rounded-2xl p-2.5 shadow-2xl border border-blue-500/40 text-xs relative animate-bounce max-w-[240px]">
+        <div className="bg-slate-900/95 text-white rounded-2xl p-2.5 shadow-2xl border border-blue-500/40 text-xs relative animate-bounce max-w-[220px] sm:max-w-[240px]">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -50,7 +50,7 @@ export const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
 
       {/* Expanded Popup Menu Box */}
       {isOpen && (
-        <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-4 shadow-2xl border border-blue-500/40 w-[290px] sm:w-[320px] transition-all animate-in fade-in zoom-in-95 origin-bottom-right">
+        <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-4 shadow-2xl border border-blue-500/40 w-[280px] sm:w-[320px] transition-all animate-in fade-in zoom-in-95 origin-bottom-right">
           {/* Header Bar */}
           <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
             <div className="flex items-center gap-2">

@@ -402,6 +402,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     </button>
                   ))}
                 </div>
+                {paymentMethod === 'CASH' && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 flex items-start gap-2">
+                    <span className="text-base leading-none">💡</span>
+                    <p className="text-[11px] leading-relaxed">
+                      <strong>Cash on Delivery:</strong> No advance payment required today. Hand cash to the technician after the job is completed. Your <strong>GST Tax Invoice</strong> will be generated immediately upon cash settlement.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Order Calculation Breakdown */}
@@ -473,7 +481,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Confirm & Pay ₹{totalAmount}</span>
+                  <span>
+                    {paymentMethod === 'CASH'
+                      ? `Confirm COD Order (₹${totalAmount})`
+                      : `Confirm & Pay ₹${totalAmount}`}
+                  </span>
                 </>
               )}
             </button>

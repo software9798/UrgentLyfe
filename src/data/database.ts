@@ -17,6 +17,8 @@ import {
   AIRecommendation,
   Address,
   UserRole,
+  ReferralRecord,
+  ReferralStats,
 } from '../types';
 import { CITIES, CATEGORIES, SERVICES, PARTNERS, MOCK_BOOKINGS } from './mockData';
 
@@ -41,6 +43,8 @@ export class UrgentLyfeDatabase {
   public voiceHistory: Map<string, VoiceHistoryItem> = new Map();
   public providerScores: Map<string, ProviderScore> = new Map();
   public aiRecommendations: Map<string, AIRecommendation> = new Map();
+  public activeOtps: Map<string, { otp: string; expiresAt: number }> = new Map();
+  public referrals: Map<string, ReferralRecord> = new Map();
 
   constructor() {
     this.seedDatabase();
@@ -293,9 +297,251 @@ export class UrgentLyfeDatabase {
       reason: 'Hot weather in Bengaluru & scheduled 90 days ago.',
       createdAt: new Date().toISOString(),
     });
+
+    // 13. Seed Referrals for Default Customer (Aarav Mehta)
+    const ref1: ReferralRecord = {
+      id: 'ref-101',
+      referrerUserId: customerUser.id,
+      referredName: 'Vikram Malhotra',
+      referredPhone: '+91 98450 11223',
+      referredEmail: 'vikram.m@gmail.com',
+      serviceName: 'Power Foam Jet AC Service',
+      bookingId: 'UL-7429',
+      rewardAmount: 250,
+      status: 'REWARD_CREDITED',
+      createdAt: new Date(Date.now() - 6 * 86400000).toISOString(),
+      completedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    };
+    const ref2: ReferralRecord = {
+      id: 'ref-102',
+      referrerUserId: customerUser.id,
+      referredName: 'Priya Sharma',
+      referredPhone: '+91 97120 44556',
+      referredEmail: 'priya.sharma@yahoo.com',
+      serviceName: 'Emergency Short Circuit Repair',
+      bookingId: 'UL-8104',
+      rewardAmount: 250,
+      status: 'REWARD_CREDITED',
+      createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+      completedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+    };
+    const ref3: ReferralRecord = {
+      id: 'ref-103',
+      referrerUserId: customerUser.id,
+      referredName: 'Rohan Das',
+      referredPhone: '+91 99012 33445',
+      referredEmail: 'rohan.das@outlook.com',
+      serviceName: 'Kitchen Water Leakage Drain Repair',
+      bookingId: 'UL-9022',
+      rewardAmount: 250,
+      status: 'PENDING_FIRST_SERVICE',
+      createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+    };
+    const ref4: ReferralRecord = {
+      id: 'ref-104',
+      referrerUserId: customerUser.id,
+      referredName: 'Sneha Patel',
+      referredPhone: '+91 98860 99887',
+      referredEmail: 'sneha.p@gmail.com',
+      rewardAmount: 250,
+      status: 'PENDING_FIRST_SERVICE',
+      createdAt: new Date().toISOString(),
+    };
+
+    this.referrals.set(ref1.id, ref1);
+    this.referrals.set(ref2.id, ref2);
+    this.referrals.set(ref3.id, ref3);
+    this.referrals.set(ref4.id, ref4);
   }
 
   // --- AUTH METHODS ---
+
+  // Helper to normalize phone number
+  public normalizePhone(phone: string): string {
+    return phone.replace(/[^0-9+]/g, '').trim();
+  }
+
+  // 1. Send OTP to Mobile Number
+  public sendOtp(phone: string): { success: boolean; message: string; otp: string; phone: string } {
+    const cleanPhone = this.normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.length < 10) {
+      throw new Error('Please enter a valid 10-digit mobile number.');
+    }
+
+    // Generate 6-digit OTP (e.g. 482910)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+
+    this.activeOtps.set(cleanPhone, { otp, expiresAt });
+
+    return {
+      success: true,
+      message: `OTP sent successfully to ${cleanPhone}`,
+      otp, // Provided for easy development & instant testing
+      phone: cleanPhone,
+    };
+  }
+
+  // 2. Verify OTP and Log In or Create User
+  public verifyOtp(data: {
+    phone: string;
+    otp: string;
+    role?: UserRole;
+    fullName?: string;
+  }): { token: string; user: User; providerProfile?: ProviderProfile; isNewUser: boolean } {
+    const cleanPhone = this.normalizePhone(data.phone);
+    const stored = this.activeOtps.get(cleanPhone);
+
+    // Allow static demo bypass code '123456' or valid generated OTP
+    const isValid = (stored && stored.otp === data.otp.trim() && stored.expiresAt > Date.now()) || data.otp.trim() === '123456';
+
+    if (!isValid) {
+      throw new Error('Invalid or expired OTP. Please enter the correct 6-digit code or request a new OTP.');
+    }
+
+    // Clear OTP after successful use
+    this.activeOtps.delete(cleanPhone);
+
+    // Find if user already exists by phone
+    let foundUser: (User & { passwordHash: string }) | undefined;
+    for (const u of this.users.values()) {
+      if (this.normalizePhone(u.phone) === cleanPhone || (cleanPhone.endsWith(u.phone.replace(/[^0-9]/g, '')) && u.phone.length >= 10)) {
+        foundUser = u;
+        break;
+      }
+    }
+
+    let isNewUser = false;
+    if (!foundUser) {
+      // Auto-create user profile for this phone
+      isNewUser = true;
+      const salt = bcrypt.genSaltSync(10);
+      const passwordHash = bcrypt.hashSync('otp-login-auto-pass', salt);
+      const userId = `usr-otp-${Date.now()}`;
+      const generatedEmail = `user.${cleanPhone.replace(/[^0-9]/g, '').slice(-10)}@urgentlyfe.com`;
+      const name = data.fullName || `Customer ${cleanPhone.slice(-4)}`;
+
+      foundUser = {
+        id: userId,
+        email: generatedEmail,
+        passwordHash,
+        fullName: name,
+        phone: cleanPhone,
+        role: data.role || 'CUSTOMER',
+        city: 'Bengaluru',
+        addresses: [
+          {
+            id: `addr-${Date.now()}`,
+            label: 'Home',
+            line1: 'Flat 101, Residency',
+            locality: 'Indiranagar',
+            city: 'Bengaluru',
+            pincode: '560038',
+            landmark: 'Near Main Road',
+            isDefault: true,
+          },
+        ],
+        walletBalance: 200, // Welcome bonus
+        loyaltyPoints: 50,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+        createdAt: new Date().toISOString(),
+      };
+      this.users.set(userId, foundUser);
+    }
+
+    if (foundUser.isBlocked) {
+      throw new Error('Your account has been suspended by Administrator.');
+    }
+
+    const sanitized = this.sanitizeUser(foundUser);
+    let providerProf: ProviderProfile | undefined;
+
+    if (sanitized.role === 'PROVIDER') {
+      for (const p of this.providers.values()) {
+        if (p.userId === sanitized.id) {
+          providerProf = p;
+          break;
+        }
+      }
+    }
+
+    const token = this.generateJWT(sanitized);
+    return { token, user: sanitized, providerProfile: providerProf, isNewUser };
+  }
+
+  // 3. Google Sign-In / 1-Click Authentication
+  public loginWithGoogle(data: {
+    email: string;
+    fullName: string;
+    avatar?: string;
+    role?: UserRole;
+  }): { token: string; user: User; providerProfile?: ProviderProfile; isNewUser: boolean } {
+    const normalizedEmail = data.email.toLowerCase().trim();
+    let foundUser: (User & { passwordHash: string }) | undefined;
+
+    for (const u of this.users.values()) {
+      if (u.email.toLowerCase() === normalizedEmail) {
+        foundUser = u;
+        break;
+      }
+    }
+
+    let isNewUser = false;
+    if (!foundUser) {
+      isNewUser = true;
+      const salt = bcrypt.genSaltSync(10);
+      const passwordHash = bcrypt.hashSync(`google-auth-${Date.now()}`, salt);
+      const userId = `usr-google-${Date.now()}`;
+
+      foundUser = {
+        id: userId,
+        email: normalizedEmail,
+        passwordHash,
+        fullName: data.fullName,
+        phone: '+91 98765 00000',
+        role: data.role || 'CUSTOMER',
+        city: 'Bengaluru',
+        addresses: [
+          {
+            id: `addr-${Date.now()}`,
+            label: 'Home',
+            line1: 'Skyline Tower 4B',
+            locality: 'Koramangala',
+            city: 'Bengaluru',
+            pincode: '560034',
+            landmark: 'Near Forum',
+            isDefault: true,
+          },
+        ],
+        walletBalance: 200, // Welcome bonus
+        loyaltyPoints: 50,
+        avatar: data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.fullName)}`,
+        createdAt: new Date().toISOString(),
+      };
+      this.users.set(userId, foundUser);
+    }
+
+    if (foundUser.isBlocked) {
+      throw new Error('Your account has been suspended by Administrator.');
+    }
+
+    const sanitized = this.sanitizeUser(foundUser);
+    let providerProf: ProviderProfile | undefined;
+
+    if (sanitized.role === 'PROVIDER') {
+      for (const p of this.providers.values()) {
+        if (p.userId === sanitized.id) {
+          providerProf = p;
+          break;
+        }
+      }
+    }
+
+    const token = this.generateJWT(sanitized);
+    return { token, user: sanitized, providerProfile: providerProf, isNewUser };
+  }
+
+  // 4. Comprehensive User Registration (Sign up with all details)
   public registerUser(data: {
     email: string;
     password: string;
@@ -303,34 +549,71 @@ export class UrgentLyfeDatabase {
     phone: string;
     role: UserRole;
     city?: string;
+    locality?: string;
+    addressLine?: string;
+    pincode?: string;
+    addressLabel?: string;
+    landmark?: string;
     skills?: string[];
     experienceYears?: number;
     categoryId?: string;
+    avatar?: string;
   }): { token: string; user: User; providerProfile?: ProviderProfile } {
     // Check if email exists
     const normalizedEmail = data.email.toLowerCase().trim();
     for (const u of this.users.values()) {
       if (u.email.toLowerCase() === normalizedEmail) {
-        throw new Error('User with this email already exists.');
+        throw new Error('An account with this email address already exists. Please sign in instead.');
       }
+    }
+
+    const cleanPhone = this.normalizePhone(data.phone);
+    if (!cleanPhone || cleanPhone.length < 10) {
+      throw new Error('Please provide a valid 10-digit mobile number.');
     }
 
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(data.password, salt);
     const userId = `usr-${Date.now()}`;
+    const targetCity = data.city || 'Bengaluru';
+
+    // Construct primary initial address from registration details
+    const initialAddresses: Address[] = [];
+    if (data.addressLine || data.locality) {
+      initialAddresses.push({
+        id: `addr-${Date.now()}`,
+        label: (data.addressLabel as 'Home' | 'Work' | 'Other') || 'Home',
+        line1: data.addressLine || 'Street Address',
+        locality: data.locality || 'Locality Area',
+        city: targetCity,
+        pincode: data.pincode || '560001',
+        landmark: data.landmark || undefined,
+        isDefault: true,
+      });
+    } else {
+      initialAddresses.push({
+        id: `addr-${Date.now()}`,
+        label: 'Home',
+        line1: 'Flat 101, Sunshine Heights',
+        locality: 'Central Hub',
+        city: targetCity,
+        pincode: data.pincode || '560001',
+        isDefault: true,
+      });
+    }
 
     const newUser: User & { passwordHash: string } = {
       id: userId,
       email: normalizedEmail,
       passwordHash,
-      fullName: data.fullName,
-      phone: data.phone || '+91 90000 00000',
+      fullName: data.fullName.trim(),
+      phone: cleanPhone,
       role: data.role || 'CUSTOMER',
-      city: data.city || 'Bengaluru',
-      addresses: [],
-      walletBalance: data.role === 'CUSTOMER' ? 200 : 0, // Signup bonus
+      city: targetCity,
+      addresses: initialAddresses,
+      walletBalance: data.role === 'CUSTOMER' ? 200 : 0, // Signup welcome bonus
       loyaltyPoints: 50,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.fullName)}`,
+      avatar: data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.fullName)}`,
       createdAt: new Date().toISOString(),
     };
 
@@ -342,25 +625,25 @@ export class UrgentLyfeDatabase {
       providerProfile = {
         id: profId,
         userId: userId,
-        fullName: data.fullName,
-        phone: data.phone,
+        fullName: data.fullName.trim(),
+        phone: cleanPhone,
         avatar: newUser.avatar!,
-        bio: `${data.fullName} - Skilled service professional`,
-        skills: data.skills || ['General Maintenance'],
+        bio: `${data.fullName.trim()} - Certified ${data.categoryId || 'Home Service'} Specialist with ${data.experienceYears || 2} years of verified field experience.`,
+        skills: data.skills && data.skills.length > 0 ? data.skills : ['Standard Inspection', 'Emergency Repairs'],
         experienceYears: data.experienceYears || 2,
         categoryId: data.categoryId || 'electrical',
-        city: data.city || 'Bengaluru',
+        city: targetCity,
         availability: 'available',
         rating: 5.0,
         totalJobs: 0,
         hourlyRate: 399,
-        verified: true, // Auto-verified for instant demo
-        badge: 'New Professional',
+        verified: true, // Instant verified badge for demo
+        badge: 'Certified Professional',
         createdAt: new Date().toISOString(),
       };
       this.providers.set(profId, providerProfile);
 
-      // Add provider score
+      // Add initial provider score
       this.providerScores.set(profId, {
         id: `score-${profId}`,
         providerId: profId,
@@ -378,23 +661,31 @@ export class UrgentLyfeDatabase {
     return { token, user: sanitizedUser, providerProfile };
   }
 
+  // 5. Standard Login via Email OR Phone with Password
   public loginUser(data: {
-    email: string;
+    email?: string;
+    phone?: string;
+    emailOrPhone?: string;
     password: string;
     role?: UserRole;
   }): { token: string; user: User; providerProfile?: ProviderProfile } {
-    const normalizedEmail = data.email.toLowerCase().trim();
+    const searchIdentifier = (data.emailOrPhone || data.email || data.phone || '').trim().toLowerCase();
+    const cleanPhone = this.normalizePhone(searchIdentifier);
+
     let foundUser: (User & { passwordHash: string }) | undefined;
 
     for (const u of this.users.values()) {
-      if (u.email.toLowerCase() === normalizedEmail) {
+      if (
+        u.email.toLowerCase() === searchIdentifier ||
+        (cleanPhone && cleanPhone.length >= 8 && this.normalizePhone(u.phone).includes(cleanPhone))
+      ) {
         foundUser = u;
         break;
       }
     }
 
     if (!foundUser) {
-      throw new Error('Invalid email or password.');
+      throw new Error('No account found with this email or mobile number.');
     }
 
     if (foundUser.isBlocked) {
@@ -403,7 +694,7 @@ export class UrgentLyfeDatabase {
 
     const isMatch = bcrypt.compareSync(data.password, foundUser.passwordHash);
     if (!isMatch) {
-      throw new Error('Invalid email or password.');
+      throw new Error('Incorrect password. Please verify and try again.');
     }
 
     const sanitized = this.sanitizeUser(foundUser);
@@ -510,7 +801,20 @@ export class UrgentLyfeDatabase {
   }
 
   // --- NOTIFICATIONS CRUD ---
-  public addNotification(userId: string, title: string, message: string, type: any = 'SYSTEM'): Notification {
+  public addNotification(
+    userId: string,
+    title: string,
+    message: string,
+    type: any = 'SYSTEM',
+    options?: {
+      bookingId?: string;
+      directionsUrl?: string;
+      actionUrl?: string;
+      is1HourAlert?: boolean;
+      scheduledTime?: string;
+      destinationAddress?: string;
+    }
+  ): Notification {
     const notif: Notification = {
       id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       userId,
@@ -518,10 +822,76 @@ export class UrgentLyfeDatabase {
       message,
       read: false,
       type,
+      bookingId: options?.bookingId,
+      directionsUrl: options?.directionsUrl,
+      actionUrl: options?.actionUrl,
+      is1HourAlert: options?.is1HourAlert,
+      scheduledTime: options?.scheduledTime,
+      destinationAddress: options?.destinationAddress,
       createdAt: new Date().toISOString(),
     };
     this.notifications.set(notif.id, notif);
     return notif;
+  }
+
+  public triggerOneHourAlert(bookingId: string): { customerNotif: Notification; providerNotif?: Notification } {
+    const booking = this.bookings.get(bookingId);
+    if (!booking) throw new Error('Booking not found');
+
+    const addressQuery = [
+      booking.userAddress.line1,
+      booking.userAddress.locality,
+      booking.userAddress.city,
+      booking.userAddress.pincode,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressQuery)}&travelmode=driving`;
+    const slot = booking.scheduledTimeSlot || '10:00 AM - 11:00 AM';
+
+    // 1. Customer Notification
+    const customerNotif = this.addNotification(
+      booking.userId,
+      `⏰ Service Reminder: 1 Hour to Service!`,
+      `Your booking #${booking.id} (${booking.service.title}) starts at ${slot}. Expert ${booking.partner?.name || 'Technician'} is preparing.`,
+      'REMINDER_1HR',
+      {
+        bookingId: booking.id,
+        directionsUrl,
+        is1HourAlert: true,
+        scheduledTime: slot,
+        destinationAddress: addressQuery,
+      }
+    );
+
+    // 2. Provider Notification
+    let providerNotif: Notification | undefined;
+    if (booking.partner?.id) {
+      // Find provider user
+      const providerProfile = this.providers.get(booking.partner.id);
+      const targetUserId = providerProfile?.userId || 'usr-provider-101';
+
+      providerNotif = this.addNotification(
+        targetUserId,
+        `🧭 1-Hour Alert: Job #${booking.id} Directions Ready`,
+        `Upcoming service at ${booking.userAddress.locality} for ${booking.userName} in 1 hour (${slot}). Click for One-Click Directions!`,
+        'REMINDER_1HR',
+        {
+          bookingId: booking.id,
+          directionsUrl,
+          is1HourAlert: true,
+          scheduledTime: slot,
+          destinationAddress: addressQuery,
+        }
+      );
+    }
+
+    booking.oneHourAlertSent = true;
+    booking.oneHourAlertSentAt = new Date().toISOString();
+    this.bookings.set(booking.id, booking);
+
+    return { customerNotif, providerNotif };
   }
 
   public getUserNotifications(userId: string): Notification[] {
@@ -537,6 +907,109 @@ export class UrgentLyfeDatabase {
       return true;
     }
     return false;
+  }
+
+  // --- REFERRAL & EARN ENGINE ---
+  public getUserReferralCode(user: User): string {
+    const namePart = (user.fullName.split(' ')[0] || 'URGENT').toUpperCase().replace(/[^A-Z]/g, '');
+    return `${namePart}250`;
+  }
+
+  public getReferralStats(userId: string): ReferralStats {
+    const user = this.users.get(userId) || Array.from(this.users.values())[0];
+    const referralCode = this.getUserReferralCode(user);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://urgentlyfe.app';
+    const referralLink = `${origin}?ref=${referralCode}`;
+
+    const userReferrals = Array.from(this.referrals.values())
+      .filter((r) => r.referrerUserId === user.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const completedReferrals = userReferrals.filter((r) => r.status === 'REWARD_CREDITED').length;
+    const pendingReferrals = userReferrals.filter((r) => r.status === 'PENDING_FIRST_SERVICE').length;
+    const totalEarnings = completedReferrals * 250;
+
+    return {
+      referralCode,
+      referralLink,
+      totalReferrals: userReferrals.length,
+      completedReferrals,
+      pendingReferrals,
+      totalEarnings,
+      walletBalance: user.walletBalance,
+      rewardPerReferral: 250,
+      friendDiscount: 200,
+      referrals: userReferrals,
+    };
+  }
+
+  public sendReferralInvite(
+    userId: string,
+    data: { friendName: string; friendPhone: string; friendEmail?: string }
+  ): ReferralRecord {
+    const user = this.users.get(userId);
+    if (!user) throw new Error('User not found.');
+
+    if (!data.friendName || !data.friendPhone) {
+      throw new Error("Friend's name and mobile number are required.");
+    }
+
+    const cleanPhone = this.normalizePhone(data.friendPhone);
+    const newRecord: ReferralRecord = {
+      id: `ref-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      referrerUserId: user.id,
+      referredName: data.friendName.trim(),
+      referredPhone: cleanPhone.startsWith('+91') ? cleanPhone : `+91 ${cleanPhone}`,
+      referredEmail: data.friendEmail?.trim(),
+      rewardAmount: 250,
+      status: 'PENDING_FIRST_SERVICE',
+      createdAt: new Date().toISOString(),
+    };
+
+    this.referrals.set(newRecord.id, newRecord);
+
+    // Add notification to referrer
+    this.addNotification(
+      user.id,
+      'Referral Invite Dispatched 🎁',
+      `Invite sent to ${newRecord.referredName} (+91 ${cleanPhone}). ₹250 wallet credit will unlock on their first completed service!`,
+      'OFFER'
+    );
+
+    return newRecord;
+  }
+
+  public simulateCompleteReferral(userId: string, referralId: string): ReferralStats {
+    const referral = this.referrals.get(referralId);
+    if (!referral) throw new Error('Referral record not found.');
+
+    if (referral.status === 'REWARD_CREDITED') {
+      return this.getReferralStats(userId);
+    }
+
+    referral.status = 'REWARD_CREDITED';
+    referral.serviceName = referral.serviceName || 'Power Foam Jet AC Service';
+    referral.bookingId = referral.bookingId || `UL-${Math.floor(1000 + Math.random() * 9000)}`;
+    referral.completedAt = new Date().toISOString();
+    this.referrals.set(referral.id, referral);
+
+    // Credit ₹250 to referrer user's wallet
+    const referrer = this.users.get(referral.referrerUserId);
+    if (referrer) {
+      referrer.walletBalance = (referrer.walletBalance || 0) + 250;
+      referrer.loyaltyPoints = (referrer.loyaltyPoints || 0) + 50;
+      this.users.set(referrer.id, referrer);
+
+      // Add high-priority notification & payment record
+      this.addNotification(
+        referrer.id,
+        '₹250 Referral Bonus Credited! 💰',
+        `Hurray! ${referral.referredName} completed their first booking (${referral.serviceName}). ₹250 is added to your UrgentLyfe Wallet!`,
+        'OFFER'
+      );
+    }
+
+    return this.getReferralStats(userId);
   }
 }
 

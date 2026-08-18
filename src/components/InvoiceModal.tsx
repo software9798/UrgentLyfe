@@ -109,6 +109,57 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
           </div>
 
+          {/* Cash on Delivery Payment Verified Banner */}
+          {booking.paymentMethod === 'CASH' ? (
+            <div className="bg-emerald-50 border-2 border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                  💵
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-emerald-950 text-xs">Cash on Delivery (COD) Paid</span>
+                    <span className="bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                      Verified
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800">
+                    Payment of <strong className="text-emerald-950">₹{booking.totalAmount}</strong> collected in cash by technician ({booking.partner?.name || 'UrgentLyfe Partner'}). Zero balance remaining.
+                  </p>
+                </div>
+              </div>
+              <div className="hidden sm:block text-right shrink-0">
+                <span className="inline-block border-2 border-emerald-600 text-emerald-800 font-mono font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider bg-white">
+                  PAID IN CASH ✓
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border-2 border-blue-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                  💳
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-blue-950 text-xs">Online Payment Verified & Service Delivered</span>
+                    <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                      PAID & VERIFIED
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-blue-800">
+                    Payment of <strong className="text-blue-950">₹{booking.totalAmount}</strong> settled via {booking.paymentMethod || 'UPI / Card'}. Service completed by {booking.partner?.name || 'UrgentLyfe Partner'}.
+                  </p>
+                </div>
+              </div>
+              <div className="hidden sm:block text-right shrink-0">
+                <span className="inline-block border-2 border-blue-600 text-blue-800 font-mono font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider bg-white">
+                  COMPLETED & PAID ✓
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Billed To & Booking Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
             <div>
@@ -121,7 +172,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider mb-1">Order Summary</p>
               <p className="text-slate-700"><span className="font-semibold">Booking ID:</span> #{booking.id}</p>
               <p className="text-slate-700"><span className="font-semibold">Technician:</span> {booking.partner?.name || 'Certified UrgentLyfe Partner'}</p>
-              <p className="text-slate-700"><span className="font-semibold">Payment Method:</span> {booking.paymentMethod || 'UPI / Online'}</p>
+              <p className="text-slate-700">
+                <span className="font-semibold">Payment Method:</span>{' '}
+                {booking.paymentMethod === 'CASH' ? (
+                  <span className="font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
+                    Cash On Delivery (COD)
+                  </span>
+                ) : (
+                  booking.paymentMethod || 'UPI / Online'
+                )}
+              </p>
               <p className="text-slate-700 flex items-center gap-1">
                 <span className="font-semibold">Warranty:</span>
                 <span className="text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.2 rounded text-[10px]">

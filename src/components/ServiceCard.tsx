@@ -1,20 +1,30 @@
 import React from 'react';
-import { Star, Clock, Zap, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Star, Clock, Zap, CheckCircle2, ChevronRight, ArrowRightLeft, Check } from 'lucide-react';
 import { ServiceItem } from '../types';
 
 interface ServiceCardProps {
   service: ServiceItem;
   onSelectService: (service: ServiceItem) => void;
   onBookUrgent: (service: ServiceItem) => void;
+  isComparing?: boolean;
+  onToggleCompare?: (service: ServiceItem) => void;
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({
   service,
   onSelectService,
   onBookUrgent,
+  isComparing = false,
+  onToggleCompare,
 }) => {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden group">
+    <div
+      className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col overflow-hidden group ${
+        isComparing
+          ? 'border-indigo-600 ring-2 ring-indigo-600/20 shadow-md'
+          : 'border-slate-200/90 shadow-xs hover:shadow-md'
+      }`}
+    >
       {/* Image & Badges Container */}
       <div className="relative h-44 w-full bg-slate-100 overflow-hidden shrink-0">
         <img
@@ -33,13 +43,42 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
           </div>
         )}
 
-        {/* SOS Tag */}
-        {service.isUrgentAvailable && (
-          <div className="absolute top-3 right-3 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs flex items-center gap-0.5">
-            <Zap className="w-3 h-3 fill-slate-950" />
-            <span>30 MIN SOS</span>
-          </div>
-        )}
+        {/* SOS Tag & Compare Toggle */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+          {onToggleCompare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCompare(service);
+              }}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md transition-all cursor-pointer flex items-center gap-1 shadow-xs ${
+                isComparing
+                  ? 'bg-indigo-600 text-white ring-1 ring-white/50 font-black'
+                  : 'bg-slate-900/70 hover:bg-slate-900 text-slate-200 hover:text-white'
+              }`}
+              title={isComparing ? 'Remove from compare' : 'Add to compare (up to 3)'}
+            >
+              {isComparing ? (
+                <>
+                  <Check className="w-3 h-3 text-white" />
+                  <span>Comparing</span>
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft className="w-3 h-3 text-amber-300" />
+                  <span>Compare</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {service.isUrgentAvailable && (
+            <div className="bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs flex items-center gap-0.5">
+              <Zap className="w-3 h-3 fill-slate-950" />
+              <span>30 MIN SOS</span>
+            </div>
+          )}
+        </div>
 
         {/* Rating Overlay */}
         <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-md text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">

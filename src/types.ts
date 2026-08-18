@@ -160,6 +160,9 @@ export interface Booking {
   workPhotos?: string[];
   userReviewText?: string;
   userStarRating?: number;
+  oneHourAlertSent?: boolean;
+  oneHourAlertSentAt?: string;
+  destinationCoords?: { lat: number; lng: number };
 }
 
 export interface Review {
@@ -202,7 +205,13 @@ export interface Notification {
   message: string;
   read: boolean;
   createdAt: string;
-  type?: 'BOOKING' | 'OFFER' | 'SYSTEM' | 'SECURITY';
+  type?: 'BOOKING' | 'OFFER' | 'SYSTEM' | 'SECURITY' | 'REMINDER_1HR';
+  bookingId?: string;
+  directionsUrl?: string;
+  actionUrl?: string;
+  is1HourAlert?: boolean;
+  scheduledTime?: string;
+  destinationAddress?: string;
 }
 
 export interface LocationItem {
@@ -309,6 +318,33 @@ export interface Coupon {
   maxDiscount: number;
   minOrder: number;
   description: string;
+}
+
+export interface ReferralRecord {
+  id: string;
+  referrerUserId: string;
+  referredName: string;
+  referredPhone: string;
+  referredEmail?: string;
+  serviceName?: string;
+  bookingId?: string;
+  rewardAmount: number; // e.g. 250
+  status: 'PENDING_FIRST_SERVICE' | 'REWARD_CREDITED' | 'EXPIRED';
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ReferralStats {
+  referralCode: string;
+  referralLink: string;
+  totalReferrals: number;
+  completedReferrals: number;
+  pendingReferrals: number;
+  totalEarnings: number;
+  walletBalance: number;
+  rewardPerReferral: number;
+  friendDiscount: number;
+  referrals: ReferralRecord[];
 }
 
 export interface APIResponse<T> {

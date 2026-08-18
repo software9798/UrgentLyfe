@@ -20,11 +20,18 @@ import { ProviderProfileModal } from './components/ProviderProfileModal';
 import { AIVoiceAssistantModal } from './components/AIVoiceAssistantModal';
 import { PostServiceFeedbackModal } from './components/PostServiceFeedbackModal';
 import { InvoiceModal } from './components/InvoiceModal';
+import { CompareFloatingBar } from './components/CompareFloatingBar';
+import { CompareServicesModal } from './components/CompareServicesModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { DirectionsModal } from './components/DirectionsModal';
+import { PushNotificationToast } from './components/PushNotificationToast';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
 
 import { CITIES, CATEGORIES, SERVICES, PARTNERS, MOCK_BOOKINGS } from './data/mockData';
-import { City, Category, ServiceItem, Booking, AIDiagnosis, Partner, User, ProviderProfile, AuthResponse } from './types';
+import { City, Category, ServiceItem, Booking, AIDiagnosis, Partner, User, ProviderProfile, AuthResponse, Notification as AppNotification } from './types';
 import { api } from './api/client';
-import { Sparkles, Zap, Wrench, ShoppingBag, CheckCircle2, WifiOff } from 'lucide-react';
+import { pushService } from './utils/pushNotificationService';
+import { Sparkles, Zap, Wrench, ShoppingBag, CheckCircle2, WifiOff, ArrowRightLeft } from 'lucide-react';
 
 export default function App() {
   const [cities, setCities] = useState<City[]>(CITIES);
@@ -36,6 +43,10 @@ export default function App() {
   const [services, setServices] = useState<ServiceItem[]>(SERVICES);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Compare Feature State (up to 3 services)
+  const [compareList, setCompareList] = useState<ServiceItem[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+
   // Authentication State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
@@ -46,6 +57,7 @@ export default function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState<boolean>(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null);
+  const [dashboardDefaultTab, setDashboardDefaultTab] = useState<'bookings' | 'trends' | 'refer_earn' | 'profile' | 'ai_history' | 'feedback'>('bookings');
 
   const [selectedServiceDetail, setSelectedServiceDetail] = useState<ServiceItem | null>(null);
   const [isBookingWizardOpen, setIsBookingWizardOpen] = useState<boolean>(false);
@@ -76,12 +88,51 @@ export default function App() {
   const [walletBalance, setWalletBalance] = useState<number>(1250);
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
 
+  // Push Notifications & Directions State
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [directionsModalBooking, setDirectionsModalBooking] = useState<Booking | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([
+    {
+      id: 'notif-welcome-1',
+      userId: 'usr-customer-101',
+      title: '⏰ 1-Hour Service Alert System Ready',
+      message: 'UrgentLyfe will alert you 1 hour before scheduled service times with One-Click Turn-by-Turn GPS Directions.',
+      read: false,
+      is1HourAlert: true,
+      type: 'REMINDER_1HR',
+      createdAt: new Date().toISOString(),
+    },
+  ]);
+
   // Toast Notification
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const data = await api.getNotifications();
+      if (Array.isArray(data) && data.length > 0) {
+        setNotifications(data);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    try {
+      await api.markNotificationRead(id);
+    } catch (e) {
+      // ignore
+    }
   };
 
   // Monitor network status
@@ -97,6 +148,24 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Background 1-Hour Alert Scheduler & Check
+  useEffect(() => {
+    fetchNotifications();
+
+    // Check bookings and register 1-hour alerts
+    pushService.checkAndScheduleBookings(bookings, currentUser?.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER');
+
+    const interval = setInterval(() => {
+      pushService.checkAndScheduleBookings(bookings, currentUser?.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER');
+      fetchNotifications();
+    }, 25000);
+
+    return () => {
+      clearInterval(interval);
+      pushService.clearTimers();
+    };
+  }, [bookings, currentUser]);
 
   // Restore JWT Session on App Mount
   useEffect(() => {
@@ -183,6 +252,41 @@ export default function App() {
     );
   };
 
+  // Compare Feature Handlers (Max 3 items)
+  const handleToggleCompare = (service: ServiceItem) => {
+    setCompareList((prev) => {
+      const exists = prev.some((s) => s.id === service.id);
+      if (exists) {
+        return prev.filter((s) => s.id !== service.id);
+      }
+      if (prev.length >= 3) {
+        showToast('Maximum 3 services can be compared at once.');
+        return prev;
+      }
+      showToast(`Added "${service.title}" to compare (${prev.length + 1}/3)`);
+      return [...prev, service];
+    });
+  };
+
+  const handleRemoveFromCompare = (serviceId: string) => {
+    setCompareList((prev) => prev.filter((s) => s.id !== serviceId));
+  };
+
+  const handleClearCompare = () => {
+    setCompareList([]);
+    setIsCompareModalOpen(false);
+  };
+
+  const handleAddToCompare = (service: ServiceItem) => {
+    if (compareList.some((s) => s.id === service.id)) return;
+    if (compareList.length >= 3) {
+      showToast('Maximum 3 services can be compared at once.');
+      return;
+    }
+    setCompareList((prev) => [...prev, service]);
+    showToast(`Added "${service.title}" to compare (${compareList.length + 1}/3)`);
+  };
+
   // Handle Cancel Booking
   const handleCancelBooking = async (bookingId: string) => {
     try {
@@ -254,7 +358,16 @@ export default function App() {
         }}
         onOpenAPIDocs={() => setIsAPIDocsOpen(true)}
         activeBookingsCount={activeBookingsCount}
-        onOpenBookings={() => setActiveTab('dashboard')}
+        onOpenBookings={() => {
+          setDashboardDefaultTab('bookings');
+          setActiveTab('dashboard');
+        }}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        unreadNotificationsCount={notifications.filter((n) => !n.read).length}
+        onOpenReferAndEarn={() => {
+          setDashboardDefaultTab('refer_earn');
+          setActiveTab('dashboard');
+        }}
         walletBalance={walletBalance}
         onQuickSOS={handleQuickSOS}
         currentUser={currentUser}
@@ -272,7 +385,7 @@ export default function App() {
       {/* Main Content View */}
       {currentUser?.role === 'PROVIDER' ? (
         /* Service Provider View */
-        <main className="flex-1">
+        <main className="flex-1 pb-24 md:pb-12">
           <PartnerDashboard
             partner={{
               id: providerProfile?.id || 'partner-101',
@@ -291,11 +404,13 @@ export default function App() {
             }}
             bookings={bookings}
             onUpdateStatus={handlePartnerUpdateStatus}
+            onViewInvoice={(booking) => setInvoiceBooking(booking)}
+            onOpenDirections={(booking) => setDirectionsModalBooking(booking)}
           />
         </main>
       ) : activeTab === 'dashboard' ? (
         /* Customer Dashboard View */
-        <main className="flex-1">
+        <main className="flex-1 pb-24 md:pb-12">
           <div className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3">
             <button
               onClick={() => setActiveTab('services')}
@@ -307,12 +422,15 @@ export default function App() {
           <UserDashboard
             bookings={bookings}
             walletBalance={walletBalance}
+            defaultTab={dashboardDefaultTab}
+            onWalletUpdated={(newBal) => setWalletBalance(newBal)}
             onTrackBooking={(booking) => setActiveLiveTrackingBooking(booking)}
             onOpenAIDoctor={() => setIsAIDoctorOpen(true)}
             onQuickSOS={handleQuickSOS}
             onOpenAddressManager={() => setIsAddressesOpen(true)}
             onOpenPostServiceFeedback={(booking) => setFeedbackTargetBooking(booking)}
             onViewInvoice={(booking) => setInvoiceBooking(booking)}
+            onOpenDirections={(booking) => setDirectionsModalBooking(booking)}
             onOpenVoiceFeedback={(booking) => {
               setVoiceFeedbackTargetBooking({
                 id: booking.id,
@@ -326,7 +444,7 @@ export default function App() {
         </main>
       ) : (
         /* Customer Home & Service Catalog View */
-        <main className="flex-1 pb-16">
+        <main className="flex-1 pb-24 md:pb-16">
           <HeroSection
             selectedCityName={selectedCity.name}
             onOpenAIDoctor={() => {
@@ -354,7 +472,7 @@ export default function App() {
 
           {/* Services Grid Section */}
           <section id="services-catalog-grid" className="mx-4 sm:mx-6 lg:mx-8 my-8 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                   Available Packages ({filteredServices.length})
@@ -363,6 +481,17 @@ export default function App() {
                   Upfront guaranteed pricing for {selectedLocality}, {selectedCity.name}
                 </p>
               </div>
+
+              {/* Compare Quick Access Trigger */}
+              {compareList.length > 0 && (
+                <button
+                  onClick={() => setIsCompareModalOpen(true)}
+                  className="self-start sm:self-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Compare Selected ({compareList.length}/3)</span>
+                </button>
+              )}
             </div>
 
             {filteredServices.length === 0 ? (
@@ -387,6 +516,8 @@ export default function App() {
                   <ServiceCard
                     key={service.id}
                     service={service}
+                    isComparing={compareList.some((c) => c.id === service.id)}
+                    onToggleCompare={handleToggleCompare}
                     onSelectService={(s) => setSelectedServiceDetail(s)}
                     onBookUrgent={(s) => {
                       setBookingServiceTarget(s);
@@ -438,6 +569,8 @@ export default function App() {
       <ServiceDetailModal
         service={selectedServiceDetail}
         onClose={() => setSelectedServiceDetail(null)}
+        isComparing={selectedServiceDetail ? compareList.some((c) => c.id === selectedServiceDetail.id) : false}
+        onToggleCompare={handleToggleCompare}
         onProceedBooking={(s, isUrgent) => {
           setSelectedServiceDetail(null);
           setBookingServiceTarget(s);
@@ -475,6 +608,51 @@ export default function App() {
         onCancelBooking={handleCancelBooking}
         onOpenPostServiceFeedback={(b) => setFeedbackTargetBooking(b)}
         onViewInvoice={(b) => setInvoiceBooking(b)}
+        onOpenDirections={(b) => setDirectionsModalBooking(b)}
+        onBookingUpdated={(updated) => {
+          setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+          setActiveLiveTrackingBooking(updated);
+          showToast(`💵 Cash payment of ₹${updated.totalAmount} recorded. GST Invoice generated!`);
+        }}
+      />
+
+      {/* One-Click Directions & Turn-by-Turn Route Navigation Modal */}
+      <DirectionsModal
+        isOpen={Boolean(directionsModalBooking)}
+        onClose={() => setDirectionsModalBooking(null)}
+        booking={directionsModalBooking}
+        viewerRole={currentUser?.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'}
+      />
+
+      {/* Real-time Push Notification Floating Interactive Toast */}
+      <PushNotificationToast
+        onOpenBooking={(id) => {
+          const matched = bookings.find((b) => b.id === id);
+          if (matched) setActiveLiveTrackingBooking(matched);
+        }}
+        onOpenDirections={(id) => {
+          const matched = bookings.find((b) => b.id === id);
+          if (matched) setDirectionsModalBooking(matched);
+        }}
+      />
+
+      {/* Push Notification Center & 1-Hour Alerts Hub Modal */}
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkNotificationRead}
+        bookings={bookings}
+        viewerRole={currentUser?.role === 'PROVIDER' ? 'PROVIDER' : 'CUSTOMER'}
+        onOpenBooking={(id) => {
+          setIsNotificationCenterOpen(false);
+          const matched = bookings.find((b) => b.id === id);
+          if (matched) setActiveLiveTrackingBooking(matched);
+        }}
+        onOpenDirections={(booking) => {
+          setIsNotificationCenterOpen(false);
+          setDirectionsModalBooking(booking);
+        }}
       />
 
       <InvoiceModal
@@ -554,6 +732,30 @@ export default function App() {
         onClose={() => setIsAPIDocsOpen(false)}
       />
 
+      {/* Compare Services Side-by-Side Modal */}
+      <CompareServicesModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        compareList={compareList}
+        allServices={services}
+        onRemoveService={handleRemoveFromCompare}
+        onAddService={handleAddToCompare}
+        onBookService={(service, isUrgent) => {
+          setBookingServiceTarget(service);
+          setBookingIsUrgent(isUrgent);
+          setAiDiagnosisForBooking(null);
+          setIsBookingWizardOpen(true);
+        }}
+      />
+
+      {/* Floating Compare Drawer Bar */}
+      <CompareFloatingBar
+        compareList={compareList}
+        onRemoveFromCompare={handleRemoveFromCompare}
+        onClearCompare={handleClearCompare}
+        onOpenCompareModal={() => setIsCompareModalOpen(true)}
+      />
+
       {/* Left Corner Floating AI Assistant & Voice Assistant */}
       <FloatingAIAssistant
         onOpenAIChat={() => setIsAIChatOpen(true)}
@@ -565,6 +767,24 @@ export default function App() {
           setAiDoctorCategoryHint('');
           setIsAIDoctorOpen(true);
         }}
+      />
+
+      {/* Mobile Bottom Navigation Bar (Visible on mobile/tablet screens) */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        dashboardTab={dashboardDefaultTab}
+        activeBookingsCount={activeBookingsCount}
+        onNavigateHome={() => setActiveTab('services')}
+        onNavigateBookings={() => {
+          setDashboardDefaultTab('bookings');
+          setActiveTab('dashboard');
+        }}
+        onNavigateReferEarn={() => {
+          setDashboardDefaultTab('refer_earn');
+          setActiveTab('dashboard');
+        }}
+        onQuickSOS={handleQuickSOS}
+        onOpenAIAssistant={() => setIsAIChatOpen(true)}
       />
 
       {/* Footer */}

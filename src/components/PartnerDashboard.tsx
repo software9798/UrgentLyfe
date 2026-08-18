@@ -20,24 +20,49 @@ import {
   AlertTriangle,
   Mic,
   RefreshCw,
+  Compass,
+  Navigation,
+  ExternalLink,
+  Bell,
 } from 'lucide-react';
 import { Booking, Partner, ProviderScore } from '../types';
 import { api } from '../api/client';
+import { getGoogleMapsDirectionsUrl } from '../utils/directionsHelper';
+import { pushService } from '../utils/pushNotificationService';
 
 interface PartnerDashboardProps {
   partner: Partner;
   bookings: Booking[];
   onUpdateStatus: (bookingId: string, status: string) => void;
+  onViewInvoice?: (booking: Booking) => void;
+  onOpenDirections?: (booking: Booking) => void;
 }
 
 export const PartnerDashboard: React.FC<PartnerDashboardProps> = ({
   partner,
   bookings,
   onUpdateStatus,
+  onViewInvoice,
+  onOpenDirections,
 }) => {
   const [activeTab, setActiveTab] = useState<'jobs' | 'earnings' | 'profile' | 'ai_score'>('jobs');
   const [providerScore, setProviderScore] = useState<ProviderScore | null>(null);
   const [loadingScore, setLoadingScore] = useState<boolean>(false);
+  const [alertSentMap, setAlertSentMap] = useState<Record<string, boolean>>({});
+
+  const handleSendOneHourAlert = async (job: Booking) => {
+    try {
+      pushService.trigger1HourAlert(job, 'PROVIDER');
+      setAlertSentMap((prev) => ({ ...prev, [job.id]: true }));
+      try {
+        await api.trigger1HourAlert(job.id);
+      } catch (e) {
+        // local simulation is already triggered
+      }
+    } catch (err) {
+      console.error('Failed to trigger 1-hour alert:', err);
+    }
+  };
 
   const assignedJobs = bookings.filter((b) => b.status !== 'CANCELLED');
   const completedCount = bookings.filter((b) => b.status === 'COMPLETED').length;
@@ -193,16 +218,62 @@ export const PartnerDashboard: React.FC<PartnerDashboardProps> = ({
 
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{job.service.title}</h3>
-                    <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                      <span>
-                        {job.userAddress?.line1}, {job.userAddress?.locality}, {job.userAddress?.city || 'Bengaluru'}
-                      </span>
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Customer: {job.userName} ({job.userPhone})</span>
-                    </p>
+                    <div className="flex items-start justify-between gap-2 mt-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                      <p className="text-xs text-slate-700 flex items-start gap-1.5 flex-1">
+                        <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                        <span>
+                          {job.userAddress?.line1}, {job.userAddress?.locality}, {job.userAddress?.city || 'Bengaluru'}
+                          {job.userAddress?.landmark && ` (Near ${job.userAddress.landmark})`}
+                        </span>
+                      </p>
+
+                      {/* One-Click Directions Button */}
+                      <button
+                        id={`job-directions-btn-${job.id}`}
+                        onClick={() => {
+                          if (onOpenDirections) {
+                            onOpenDirections(job);
+                          } else {
+                            window.open(getGoogleMapsDirectionsUrl(job.userAddress), '_blank');
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black px-2.5 py-1.5 rounded-lg flex items-center gap-1 shrink-0 shadow-xs transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                        title="Launch One-Click Directions in Maps"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>One-Click Directions</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 text-xs text-slate-600">
+                      <p className="flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Customer: <strong className="text-slate-900">{job.userName}</strong> ({job.userPhone})</span>
+                      </p>
+                      <a
+                        href={`tel:${job.userPhone}`}
+                        className="text-emerald-700 font-bold hover:underline"
+                      >
+                        Call Customer
+                      </a>
+                    </div>
+
+                    {/* 1-Hour Scheduled Alert Banner */}
+                    <div className="mt-2.5 flex items-center justify-between bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-amber-900">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span className="font-semibold">Slot: {job.scheduledTimeSlot}</span>
+                      </div>
+
+                      <button
+                        onClick={() => handleSendOneHourAlert(job)}
+                        className="text-[11px] font-bold text-amber-800 hover:text-amber-950 bg-amber-200/70 hover:bg-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Simulate 1-Hour Service Alert Push"
+                      >
+                        <Bell className="w-3 h-3" />
+                        <span>{alertSentMap[job.id] || job.oneHourAlertSent ? 'Alert Sent ✓' : 'Send 1-Hr Alert'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {job.notes && (
@@ -243,15 +314,35 @@ export const PartnerDashboard: React.FC<PartnerDashboardProps> = ({
                       ) : job.status === 'WORK_IN_PROGRESS' ? (
                         <button
                           onClick={() => onUpdateStatus(job.id, 'COMPLETED')}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Mark Job Complete</span>
+                          {job.paymentMethod === 'CASH' ? (
+                            <>
+                              <span>💵 Collect ₹{job.totalAmount} & Complete</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Mark Job Complete</span>
+                            </>
+                          )}
                         </button>
                       ) : (
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                          Completed ✓
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                            Completed ✓
+                          </span>
+                          {onViewInvoice && (
+                            <button
+                              onClick={() => onViewInvoice(job)}
+                              className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                              title="View GST Invoice"
+                            >
+                              <FileText className="w-3 h-3 text-blue-600" />
+                              <span>Invoice</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

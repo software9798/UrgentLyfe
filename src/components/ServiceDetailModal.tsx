@@ -10,6 +10,8 @@ import {
   ThumbsUp,
   Tag,
   Sparkles,
+  ArrowRightLeft,
+  Check,
 } from 'lucide-react';
 import { ServiceItem } from '../types';
 
@@ -18,6 +20,8 @@ interface ServiceDetailModalProps {
   onClose: () => void;
   onProceedBooking: (service: ServiceItem, isUrgent: boolean) => void;
   onOpenAIDoctorForCategory: (categoryName: string) => void;
+  isComparing?: boolean;
+  onToggleCompare?: (service: ServiceItem) => void;
 }
 
 export const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
@@ -25,6 +29,8 @@ export const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   onClose,
   onProceedBooking,
   onOpenAIDoctorForCategory,
+  isComparing = false,
+  onToggleCompare,
 }) => {
   if (!service) return null;
 
@@ -41,13 +47,38 @@ export const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 bg-slate-900/70 text-white p-2 rounded-full hover:bg-slate-900 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Action buttons: Compare & Close */}
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            {onToggleCompare && (
+              <button
+                onClick={() => onToggleCompare(service)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
+                  isComparing
+                    ? 'bg-indigo-600 text-white ring-1 ring-white/60'
+                    : 'bg-slate-900/80 hover:bg-slate-900 text-slate-200 hover:text-white border border-slate-700'
+                }`}
+              >
+                {isComparing ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-white" />
+                    <span>In Compare</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Add to Compare</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="bg-slate-900/70 text-white p-2 rounded-full hover:bg-slate-900 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
           {/* Title on Image */}
           <div className="absolute bottom-4 left-6 right-6 text-white">

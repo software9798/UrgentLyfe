@@ -13,9 +13,11 @@ import {
   Zap,
   Download,
   FileText,
+  Compass,
 } from 'lucide-react';
 import { Booking } from '../types';
 import { downloadInvoiceFile } from '../utils/invoiceGenerator';
+import { getGoogleMapsDirectionsUrl } from '../utils/directionsHelper';
 
 interface LiveTrackingModalProps {
   booking: Booking | null;
@@ -23,6 +25,8 @@ interface LiveTrackingModalProps {
   onCancelBooking: (id: string) => void;
   onOpenPostServiceFeedback?: (booking: Booking) => void;
   onViewInvoice?: (booking: Booking) => void;
+  onBookingUpdated?: (updatedBooking: Booking) => void;
+  onOpenDirections?: (booking: Booking) => void;
 }
 
 export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
@@ -31,15 +35,81 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
   onCancelBooking,
   onOpenPostServiceFeedback,
   onViewInvoice,
+  onBookingUpdated,
+  onOpenDirections,
 }) => {
   if (!booking) return null;
 
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentSuccessMsg, setPaymentSuccessMsg] = useState('');
 
-  const handleDownloadInvoice = () => {
-    downloadInvoiceFile(booking);
+  const handleDownloadInvoice = (targetBooking = booking) => {
+    if (targetBooking.status !== 'COMPLETED') {
+      alert('Official GST Tax Invoice will be generated once service work is completed by technician.');
+      return;
+    }
+    downloadInvoiceFile(targetBooking);
     setDownloadSuccess(true);
     setTimeout(() => setDownloadSuccess(false), 4000);
+  };
+
+  const handleCompleteOnlineService = async () => {
+    setIsProcessingPayment(true);
+    try {
+      const updatedBooking: Booking = {
+        ...booking,
+        status: 'COMPLETED',
+        paymentStatus: 'PAID',
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (onBookingUpdated) {
+        onBookingUpdated(updatedBooking);
+      }
+
+      setPaymentSuccessMsg(`✓ Service work marked as completed! Generating your official GST invoice...`);
+
+      setTimeout(() => {
+        setIsProcessingPayment(false);
+        if (onViewInvoice) {
+          onViewInvoice(updatedBooking);
+        }
+      }, 900);
+    } catch (err) {
+      console.error('Failed to complete service:', err);
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleCompleteCashPayment = async () => {
+    setIsProcessingPayment(true);
+    try {
+      // Update booking status to completed and payment to PAID
+      const updatedBooking: Booking = {
+        ...booking,
+        status: 'COMPLETED',
+        paymentStatus: 'PAID',
+        paymentMethod: 'CASH',
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (onBookingUpdated) {
+        onBookingUpdated(updatedBooking);
+      }
+
+      setPaymentSuccessMsg(`💵 Cash payment of ₹${booking.totalAmount} confirmed! Opening GST invoice...`);
+      
+      setTimeout(() => {
+        setIsProcessingPayment(false);
+        if (onViewInvoice) {
+          onViewInvoice(updatedBooking);
+        }
+      }, 900);
+    } catch (err) {
+      console.error('Failed to complete cash payment:', err);
+      setIsProcessingPayment(false);
+    }
   };
 
   const partner = booking.partner;
@@ -156,6 +226,36 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
             </div>
           </div>
 
+          {/* One-Click Directions Bar */}
+          <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+                <Compass className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">One-Click GPS Navigation</p>
+                <p className="text-[10px] text-blue-200">
+                  {booking.userAddress.locality}, {booking.userAddress.city}
+                </p>
+              </div>
+            </div>
+
+            <button
+              id="live-tracking-directions-btn"
+              onClick={() => {
+                if (onOpenDirections) {
+                  onOpenDirections(booking);
+                } else {
+                  window.open(getGoogleMapsDirectionsUrl(booking.userAddress), '_blank');
+                }
+              }}
+              className="bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1 transition-transform hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
+            >
+              <span>Open Directions</span>
+              <Navigation className="w-3.5 h-3.5 fill-slate-950" />
+            </button>
+          </div>
+
           {/* Status Timeline */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Status Progress</h4>
@@ -180,6 +280,152 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
             </div>
           </div>
 
+          {/* Cash on Delivery (COD) Payment Section */}
+          {booking.paymentMethod === 'CASH' && (
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-500/40 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💵</span>
+                  <div>
+                    <h4 className="text-xs font-black text-emerald-950 uppercase tracking-wide">
+                      Cash On Delivery (COD) Payment
+                    </h4>
+                    <p className="text-[11px] text-emerald-800">
+                      {booking.status === 'COMPLETED' || booking.paymentStatus === 'PAID'
+                        ? 'Payment completed and verified'
+                        : 'Hand cash to technician upon job completion'}
+                    </p>
+                  </div>
+                </div>
+                <span className="font-mono font-black text-emerald-900 bg-white border border-emerald-300 px-2.5 py-1 rounded-xl text-sm shadow-xs">
+                  ₹{booking.totalAmount}
+                </span>
+              </div>
+
+              {booking.status === 'COMPLETED' || booking.paymentStatus === 'PAID' ? (
+                <div className="bg-white border border-emerald-300 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-black text-emerald-950">Cash Received: ₹{booking.totalAmount}</p>
+                      <p className="text-[10px] text-emerald-700 font-medium">GST Tax Invoice Ready & Verified</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onViewInvoice) onViewInvoice(booking);
+                      else handleDownloadInvoice();
+                    }}
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View Tax Invoice</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    disabled={isProcessingPayment}
+                    onClick={handleCompleteCashPayment}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black py-3 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25"
+                  >
+                    {isProcessingPayment ? (
+                      <span>Processing Payment & Generating Invoice...</span>
+                    ) : (
+                      <>
+                        <span>💵 Pay ₹{booking.totalAmount} Cash & Complete Work</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-emerald-700 text-center font-medium">
+                    🔒 GST Tax Invoice is strictly generated & released after cash payment and work completion.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Online / Digital Payment Section */}
+          {booking.paymentMethod !== 'CASH' && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-500/30 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💳</span>
+                  <div>
+                    <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wide">
+                      Digital / Online Payment ({booking.paymentMethod || 'UPI/Card'})
+                    </h4>
+                    <p className="text-[11px] text-indigo-800">
+                      {booking.status === 'COMPLETED'
+                        ? 'Service completed • Final GST Tax Invoice Issued'
+                        : 'Paid in Advance • Invoice unlocks upon service completion'}
+                    </p>
+                  </div>
+                </div>
+                <span className="font-mono font-black text-indigo-950 bg-white border border-indigo-200 px-2.5 py-1 rounded-xl text-sm shadow-xs">
+                  ₹{booking.totalAmount}
+                </span>
+              </div>
+
+              {booking.status === 'COMPLETED' ? (
+                <div className="bg-white border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-black text-slate-900">Work Completed & Verified</p>
+                      <p className="text-[10px] text-emerald-700 font-medium">Official GST Tax Invoice Generated</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onViewInvoice) onViewInvoice(booking);
+                      else handleDownloadInvoice();
+                    }}
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View Tax Invoice</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="bg-white/80 border border-indigo-100 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="text-[11px] text-slate-700">
+                        Technician is working on your service. Invoice will unlock once job is complete.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    disabled={isProcessingPayment}
+                    onClick={handleCompleteOnlineService}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20"
+                  >
+                    {isProcessingPayment ? (
+                      <span>Sealing Job & Generating Tax Invoice...</span>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Mark Service Complete & Generate Invoice</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-slate-500 text-center">
+                    🔒 Compliant with GST invoicing rules: Tax invoices are issued after service delivery.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {paymentSuccessMsg && (
+            <div className="bg-emerald-500 text-white text-xs font-bold p-3 rounded-xl flex items-center gap-2 shadow-md animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{paymentSuccessMsg}</span>
+            </div>
+          )}
+
           {/* Address & Payment Info */}
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs space-y-2">
             <div className="flex justify-between text-slate-600">
@@ -192,19 +438,29 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
               <span>Total Bill (GST Incl.):</span>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-emerald-600">₹{booking.totalAmount}</span>
-                <button
-                  onClick={() => {
-                    if (onViewInvoice) {
-                      onViewInvoice(booking);
-                    } else {
-                      handleDownloadInvoice();
-                    }
-                  }}
-                  className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
-                >
-                  <FileText className="w-3 h-3 text-blue-600" />
-                  <span>GST Invoice</span>
-                </button>
+                {booking.status === 'COMPLETED' ? (
+                  <button
+                    onClick={() => {
+                      if (onViewInvoice) {
+                        onViewInvoice(booking);
+                      } else {
+                        handleDownloadInvoice();
+                      }
+                    }}
+                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span>GST Tax Invoice</span>
+                  </button>
+                ) : (
+                  <div
+                    className="bg-slate-200/80 text-slate-500 border border-slate-300 px-2.5 py-1.5 rounded-lg font-semibold text-[11px] flex items-center gap-1"
+                    title="Invoice will be available after work is completed"
+                  >
+                    <Clock className="w-3 h-3 text-amber-600" />
+                    <span>Invoice on Completion</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

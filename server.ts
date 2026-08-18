@@ -72,6 +72,15 @@ app.post('/api/auth/signup', (req, res) => {
       return res.status(400).json({ success: false, error: 'Email, password, and full name are required.' });
     }
 
+    const {
+      locality,
+      addressLine,
+      pincode,
+      addressLabel,
+      landmark,
+      avatar,
+    } = req.body;
+
     const result = db.registerUser({
       email,
       password,
@@ -79,9 +88,15 @@ app.post('/api/auth/signup', (req, res) => {
       phone,
       role: role || 'CUSTOMER',
       city,
+      locality,
+      addressLine,
+      pincode,
+      addressLabel,
+      landmark,
       skills,
       experienceYears,
       categoryId,
+      avatar,
     });
 
     res.status(201).json({
@@ -94,16 +109,16 @@ app.post('/api/auth/signup', (req, res) => {
   }
 });
 
-// Login
+// Login via Email or Mobile Number + Password
 app.post('/api/auth/login', (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, phone, emailOrPhone, password, role } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email and password are required.' });
+    if ((!email && !phone && !emailOrPhone) || !password) {
+      return res.status(400).json({ success: false, error: 'Email/Mobile Number and password are required.' });
     }
 
-    const result = db.loginUser({ email, password, role });
+    const result = db.loginUser({ email, phone, emailOrPhone, password, role });
 
     res.json({
       success: true,
@@ -112,6 +127,63 @@ app.post('/api/auth/login', (req, res) => {
     });
   } catch (error: any) {
     res.status(401).json({ success: false, error: error.message });
+  }
+});
+
+// 1. Send OTP to Mobile Number
+app.post('/api/auth/send-otp', (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'Mobile number is required.' });
+    }
+
+    const result = db.sendOtp(phone);
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Verify OTP and Log In
+app.post('/api/auth/verify-otp', (req, res) => {
+  try {
+    const { phone, otp, role, fullName } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, error: 'Mobile number and OTP code are required.' });
+    }
+
+    const result = db.verifyOtp({ phone, otp, role, fullName });
+    res.json({
+      success: true,
+      message: result.isNewUser ? `Welcome to UrgentLyfe, ${result.user.fullName}!` : `Welcome back, ${result.user.fullName}!`,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Google Sign In
+app.post('/api/auth/google', (req, res) => {
+  try {
+    const { email, fullName, avatar, role } = req.body;
+    if (!email || !fullName) {
+      return res.status(400).json({ success: false, error: 'Google email and name are required.' });
+    }
+
+    const result = db.loginWithGoogle({ email, fullName, avatar, role });
+    res.json({
+      success: true,
+      message: result.isNewUser ? `Welcome to UrgentLyfe, ${result.user.fullName}!` : `Welcome back, ${result.user.fullName}!`,
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 
@@ -236,6 +308,151 @@ app.get('/api/users/notifications', authenticateToken, (req: any, res) => {
 app.patch('/api/users/notifications/:id/read', authenticateToken, (req: any, res) => {
   const marked = db.markNotificationRead(req.params.id);
   res.json({ success: marked });
+});
+
+// Trigger 1-Hour Service Alert and generate One-Click Directions link
+app.post('/api/notifications/trigger-1hr-alert', (req: any, res) => {
+  try {
+    const { bookingId } = req.body;
+    if (!bookingId) {
+      return res.status(400).json({ success: false, error: 'bookingId is required' });
+    }
+
+    const result = db.triggerOneHourAlert(bookingId);
+    res.json({
+      success: true,
+      data: result,
+      message: '1-Hour Service Reminder Push Alert dispatched with One-Click Directions link.',
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Get Navigation & Directions Info for Booking
+app.get('/api/bookings/:id/directions', (req: any, res) => {
+  try {
+    const booking = db.bookings.get(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+
+    const addressQuery = [
+      booking.userAddress.line1,
+      booking.userAddress.landmark ? `Near ${booking.userAddress.landmark}` : '',
+      booking.userAddress.locality,
+      booking.userAddress.city,
+      booking.userAddress.pincode,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressQuery)}&travelmode=driving`;
+    const appleMapsUrl = `https://maps.apple.com/?daddr=${encodeURIComponent(addressQuery)}&dirflg=d`;
+    const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(addressQuery)}&navigate=yes`;
+
+    res.json({
+      success: true,
+      data: {
+        bookingId: booking.id,
+        customerName: booking.userName,
+        customerPhone: booking.userPhone,
+        destinationAddress: addressQuery,
+        scheduledSlot: booking.scheduledTimeSlot,
+        googleMapsUrl,
+        appleMapsUrl,
+        wazeUrl,
+        oneHourAlertSent: Boolean(booking.oneHourAlertSent),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==========================================
+// REFERRAL & EARN SYSTEM API ENDPOINTS
+// ==========================================
+
+// Get Referral Stats & User Referrals
+app.get('/api/referrals/stats', (req: any, res) => {
+  try {
+    let userId = 'usr-customer-101';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = db.verifyJWT(authHeader.split(' ')[1]);
+        if (decoded?.id) userId = decoded.id;
+      } catch {
+        // Fallback to default customer
+      }
+    }
+
+    const stats = db.getReferralStats(userId);
+    res.json({ success: true, data: stats });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Send Referral Invite
+app.post('/api/referrals/invite', (req: any, res) => {
+  try {
+    let userId = 'usr-customer-101';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = db.verifyJWT(authHeader.split(' ')[1]);
+        if (decoded?.id) userId = decoded.id;
+      } catch {
+        // Fallback
+      }
+    }
+
+    const { friendName, friendPhone, friendEmail } = req.body;
+    if (!friendName || !friendPhone) {
+      return res.status(400).json({ success: false, error: "Friend's name and mobile number are required." });
+    }
+
+    const record = db.sendReferralInvite(userId, { friendName, friendPhone, friendEmail });
+    res.status(201).json({
+      success: true,
+      data: record,
+      message: `Invitation successfully sent to ${friendName}! ₹250 wallet credit will unlock on their first completed job.`,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Simulate / Trigger Referral Service Completion (Instant reward credit testing)
+app.post('/api/referrals/simulate-complete', (req: any, res) => {
+  try {
+    let userId = 'usr-customer-101';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = db.verifyJWT(authHeader.split(' ')[1]);
+        if (decoded?.id) userId = decoded.id;
+      } catch {
+        // Fallback
+      }
+    }
+
+    const { referralId } = req.body;
+    if (!referralId) {
+      return res.status(400).json({ success: false, error: 'referralId is required.' });
+    }
+
+    const updatedStats = db.simulateCompleteReferral(userId, referralId);
+    res.json({
+      success: true,
+      data: updatedStats,
+      message: '🎉 Referral service marked completed! ₹250 wallet credit successfully deposited.',
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
 });
 
 // ==========================================

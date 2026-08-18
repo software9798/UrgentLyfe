@@ -18,6 +18,8 @@ import {
   VoiceHistoryItem,
   ProviderScore,
   AIRecommendation,
+  ReferralRecord,
+  ReferralStats,
 } from '../types';
 import { perfMonitor } from '../utils/performance';
 
@@ -66,17 +68,57 @@ export const api = {
     phone: string;
     role?: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
     city?: string;
+    locality?: string;
+    addressLine?: string;
+    pincode?: string;
+    addressLabel?: string;
+    landmark?: string;
     skills?: string[];
     experienceYears?: number;
     categoryId?: string;
+    avatar?: string;
   }): Promise<AuthResponse> =>
     fetchAPI<AuthResponse>('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  login: (data: { email: string; password: string; role?: string }): Promise<AuthResponse> =>
+  login: (data: {
+    email?: string;
+    phone?: string;
+    emailOrPhone?: string;
+    password: string;
+    role?: string;
+  }): Promise<AuthResponse> =>
     fetchAPI<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  sendOtp: (phone: string): Promise<{ success: boolean; message: string; otp: string; phone: string }> =>
+    fetchAPI<{ success: boolean; message: string; otp: string; phone: string }>('/api/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
+
+  verifyOtp: (data: {
+    phone: string;
+    otp: string;
+    role?: string;
+    fullName?: string;
+  }): Promise<AuthResponse> =>
+    fetchAPI<AuthResponse>('/api/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  googleLogin: (data: {
+    email: string;
+    fullName: string;
+    avatar?: string;
+    role?: string;
+  }): Promise<AuthResponse> =>
+    fetchAPI<AuthResponse>('/api/auth/google', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -117,6 +159,45 @@ export const api = {
 
   markNotificationRead: (id: string) =>
     fetchAPI<any>(`/api/users/notifications/${id}/read`, { method: 'PATCH' }),
+
+  trigger1HourAlert: (bookingId: string) =>
+    fetchAPI<{ customerNotif: Notification; providerNotif?: Notification }>('/api/notifications/trigger-1hr-alert', {
+      method: 'POST',
+      body: JSON.stringify({ bookingId }),
+    }),
+
+  getBookingDirections: (bookingId: string) =>
+    fetchAPI<{
+      bookingId: string;
+      customerName: string;
+      customerPhone: string;
+      destinationAddress: string;
+      scheduledSlot: string;
+      googleMapsUrl: string;
+      appleMapsUrl: string;
+      wazeUrl: string;
+      oneHourAlertSent: boolean;
+    }>(`/api/bookings/${bookingId}/directions`),
+
+  // REFERRAL & EARN SYSTEM APIs
+  getReferralStats: (): Promise<ReferralStats> =>
+    fetchAPI<ReferralStats>('/api/referrals/stats'),
+
+  sendReferralInvite: (data: {
+    friendName: string;
+    friendPhone: string;
+    friendEmail?: string;
+  }): Promise<{ success: boolean; data: ReferralRecord; message: string }> =>
+    fetchAPI<{ success: boolean; data: ReferralRecord; message: string }>('/api/referrals/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  simulateCompleteReferral: (referralId: string): Promise<ReferralStats> =>
+    fetchAPI<ReferralStats>('/api/referrals/simulate-complete', {
+      method: 'POST',
+      body: JSON.stringify({ referralId }),
+    }),
 
   // SERVICE PROVIDER APIs
   updateProviderProfile: (data: Partial<ProviderProfile>): Promise<ProviderProfile> =>

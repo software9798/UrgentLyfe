@@ -22,13 +22,23 @@ import {
   Plus,
   FileText,
   Printer,
+  TrendingUp,
+  Gift,
+  Compass,
+  Navigation,
+  Bell,
 } from 'lucide-react';
 import { Booking, UserProfile } from '../types';
 import { downloadInvoiceFile, openInvoicePrintWindow } from '../utils/invoiceGenerator';
+import { getGoogleMapsDirectionsUrl } from '../utils/directionsHelper';
+import { pushService } from '../utils/pushNotificationService';
+import { MarketTrendsSection } from './MarketTrendsSection';
+import { ReferAndEarnSection } from './ReferAndEarnSection';
 
 interface UserDashboardProps {
   bookings: Booking[];
   walletBalance: number;
+  defaultTab?: 'bookings' | 'trends' | 'refer_earn' | 'profile' | 'ai_history' | 'feedback';
   onTrackBooking: (booking: Booking) => void;
   onOpenAIDoctor: () => void;
   onQuickSOS: () => void;
@@ -36,11 +46,14 @@ interface UserDashboardProps {
   onOpenAddressManager?: () => void;
   onOpenPostServiceFeedback?: (booking: Booking) => void;
   onViewInvoice?: (booking: Booking) => void;
+  onOpenDirections?: (booking: Booking) => void;
+  onWalletUpdated?: (newBalance: number) => void;
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({
   bookings,
   walletBalance,
+  defaultTab,
   onTrackBooking,
   onOpenAIDoctor,
   onQuickSOS,
@@ -48,8 +61,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   onOpenAddressManager,
   onOpenPostServiceFeedback,
   onViewInvoice,
+  onOpenDirections,
+  onWalletUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<'bookings' | 'profile' | 'ai_history' | 'feedback'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'trends' | 'refer_earn' | 'profile' | 'ai_history' | 'feedback'>(
+    defaultTab || 'bookings'
+  );
   const [downloadSuccessId, setDownloadSuccessId] = useState<string | null>(null);
 
   const handleDownloadInvoice = (booking: Booking) => {
@@ -121,46 +138,76 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       </div>
 
       {/* Main Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-3 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar touch-pan-x">
         <button
           onClick={() => setActiveTab('bookings')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'bookings'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <ShoppingBag className="w-4 h-4" />
-          <span>Bookings & Invoices ({bookings.length})</span>
+          <span>Bookings ({bookings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('refer_earn')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
+            activeTab === 'refer_earn'
+              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-black'
+              : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+          }`}
+        >
+          <Gift className="w-4 h-4 text-amber-600" />
+          <span>Refer & Earn</span>
+          <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full font-black">
+            ₹250 Cash
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('trends')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
+            activeTab === 'trends'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-500" />
+          <span>Market Trends</span>
+          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-black hidden sm:inline">
+            30D Insights
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'profile'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <User className="w-4 h-4" />
-          <span>Profile & Addresses</span>
+          <span>Profile</span>
         </button>
 
         <button
           onClick={() => setActiveTab('ai_history')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'ai_history'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>AI Price & Voice History</span>
+          <span>AI Diagnostics</span>
         </button>
 
         <button
           onClick={() => setActiveTab('feedback')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 text-xs font-extrabold rounded-2xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'feedback'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -223,6 +270,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       <p className="text-xs text-slate-500 mt-0.5">
                         {b.userAddress.line1}, {b.userAddress.locality}
                       </p>
+
+                      {/* 1-Hour Reminder & Directions Banner */}
+                      <div className="mt-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-900">
+                          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                          <div>
+                            <span className="font-bold">Slot: {b.scheduledTimeSlot}</span>
+                            <p className="text-[10px] text-amber-700 font-medium">1-Hour Scheduled Push Alert Active</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            if (onOpenDirections) {
+                              onOpenDirections(b);
+                            } else {
+                              window.open(getGoogleMapsDirectionsUrl(b.userAddress), '_blank');
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black px-2.5 py-1.5 rounded-xl flex items-center gap-1 shrink-0 shadow-xs transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                          title="View One-Click Directions"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>One-Click Directions</span>
+                        </button>
+                      </div>
                     </div>
 
                     {b.partner && (
@@ -250,20 +323,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-base font-black text-slate-900">₹{b.totalAmount}</span>
-                        <button
-                          onClick={() => {
-                            if (onViewInvoice) {
-                              onViewInvoice(b);
-                            } else {
-                              handleDownloadInvoice(b);
-                            }
-                          }}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                          title="View or Download Tax Invoice"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Invoice</span>
-                        </button>
+                        {b.status === 'COMPLETED' ? (
+                          <button
+                            onClick={() => {
+                              if (onViewInvoice) {
+                                onViewInvoice(b);
+                              } else {
+                                handleDownloadInvoice(b);
+                              }
+                            }}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                            title="View or Download Tax Invoice"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Invoice</span>
+                          </button>
+                        ) : (
+                          <span
+                            className="bg-slate-100 text-slate-500 text-[11px] font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 border border-slate-200"
+                            title="GST Tax Invoice will be generated automatically after the technician completes the service"
+                          >
+                            <Clock className="w-3 h-3 text-amber-500" />
+                            <span>Invoice on Completion</span>
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => onTrackBooking(b)}
@@ -277,6 +360,35 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Refer & Earn Banner Card */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-indigo-950 via-blue-900 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-indigo-700/60 shadow-lg my-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md">
+                <Gift className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider bg-amber-400/20 px-2 py-0.5 rounded-full">
+                    Give ₹200, Earn ₹250 Cash
+                  </span>
+                </div>
+                <h4 className="text-sm sm:text-base font-black text-white mt-1">
+                  Invite friends & earn ₹250 wallet credits on their first booking!
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Friends get ₹200 instant off. Credits auto-deposit upon service completion.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('refer_earn')}
+              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <span>Refer & Earn Now</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Past Orders History */}
@@ -381,6 +493,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB: MARKET TRENDS & PEAK HOURS (30-Day Demand Analytics with Recharts) */}
+      {activeTab === 'trends' && (
+        <MarketTrendsSection onQuickSOS={onQuickSOS} />
       )}
 
       {/* TAB 2: PROFILE & ADDRESSES */}
@@ -623,6 +740,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB 5: REFER & EARN */}
+      {activeTab === 'refer_earn' && (
+        <ReferAndEarnSection
+          initialWalletBalance={walletBalance}
+          onWalletUpdated={onWalletUpdated}
+          onOpenSOS={onQuickSOS}
+        />
       )}
     </div>
   );
