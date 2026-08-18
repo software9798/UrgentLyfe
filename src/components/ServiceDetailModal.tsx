@@ -76,7 +76,7 @@ export const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-900">Unsure if this fixes your exact issue?</p>
-                <p className="text-[11px] text-slate-500">Run Gemini AI Doctor diagnostic test with photo/description</p>
+                <p className="text-[11px] text-slate-500">Run Gemini AI Diagnostic test with photo/description</p>
               </div>
             </div>
             <button
@@ -94,6 +94,39 @@ export const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-900 mb-2">Package Overview</h3>
             <p className="text-xs text-slate-600 leading-relaxed">{service.description}</p>
+          </div>
+
+          {/* Provider Rating Tiers Preview */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                <span>Provider Rating & Charges Options</span>
+              </h4>
+              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
+                Choose Tier on Booking
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="bg-white border border-slate-200 p-2.5 rounded-lg text-center">
+                <p className="font-extrabold text-slate-900 text-[11px]">Junior (4.0-4.4★)</p>
+                <p className="text-xs font-black text-slate-700 mt-0.5">₹{service.price}</p>
+                <p className="text-[9px] text-slate-500 mt-0.5">Standard ~50m</p>
+              </div>
+              <div className="bg-blue-50/80 border border-blue-300 p-2.5 rounded-lg text-center relative">
+                <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full">
+                  MOST POPULAR
+                </span>
+                <p className="font-extrabold text-blue-900 text-[11px]">Senior (4.5-4.7★)</p>
+                <p className="text-xs font-black text-blue-700 mt-0.5">₹{Math.round(service.price * 1.15)}</p>
+                <p className="text-[9px] text-blue-600 mt-0.5">Recommended ~35m</p>
+              </div>
+              <div className="bg-amber-50/80 border border-amber-300 p-2.5 rounded-lg text-center">
+                <p className="font-extrabold text-amber-900 text-[11px]">Master (4.8-5.0★)</p>
+                <p className="text-xs font-black text-amber-800 mt-0.5">₹{Math.round(service.price * 1.35)}</p>
+                <p className="text-[9px] text-amber-700 mt-0.5">Express ~20m</p>
+              </div>
+            </div>
           </div>
 
           {/* Inclusions & Exclusions */}

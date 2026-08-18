@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Phone,
@@ -11,21 +11,36 @@ import {
   KeyRound,
   AlertTriangle,
   Zap,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { Booking } from '../types';
+import { downloadInvoiceFile } from '../utils/invoiceGenerator';
 
 interface LiveTrackingModalProps {
   booking: Booking | null;
   onClose: () => void;
   onCancelBooking: (id: string) => void;
+  onOpenPostServiceFeedback?: (booking: Booking) => void;
+  onViewInvoice?: (booking: Booking) => void;
 }
 
 export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
   booking,
   onClose,
   onCancelBooking,
+  onOpenPostServiceFeedback,
+  onViewInvoice,
 }) => {
   if (!booking) return null;
+
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  const handleDownloadInvoice = () => {
+    downloadInvoiceFile(booking);
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 4000);
+  };
 
   const partner = booking.partner;
 
@@ -173,15 +188,52 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
                 {booking.userAddress.line1}, {booking.userAddress.locality}
               </span>
             </div>
-            <div className="flex justify-between text-slate-600">
+            <div className="flex items-center justify-between text-slate-600 pt-1 border-t border-slate-200/60">
               <span>Total Bill (GST Incl.):</span>
-              <span className="font-bold text-emerald-600">₹{booking.totalAmount}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-emerald-600">₹{booking.totalAmount}</span>
+                <button
+                  onClick={() => {
+                    if (onViewInvoice) {
+                      onViewInvoice(booking);
+                    } else {
+                      handleDownloadInvoice();
+                    }
+                  }}
+                  className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                >
+                  <FileText className="w-3 h-3 text-blue-600" />
+                  <span>GST Invoice</span>
+                </button>
+              </div>
             </div>
           </div>
 
+          {downloadSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-2.5 rounded-xl flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Tax Invoice downloaded to your device!</span>
+            </div>
+          )}
+
+          {/* Post-Service Feedback Button */}
+          {onOpenPostServiceFeedback && (
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  onOpenPostServiceFeedback(booking);
+                  onClose();
+                }}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs py-3 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>🌟 Give Rating, Work Photo & AI Voice Review</span>
+              </button>
+            </div>
+          )}
+
           {/* Cancel Order Option */}
           {booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED' && (
-            <div className="pt-2 text-center">
+            <div className="pt-1 text-center">
               <button
                 onClick={() => onCancelBooking(booking.id)}
                 className="text-xs text-red-600 hover:text-red-700 font-bold hover:underline cursor-pointer"

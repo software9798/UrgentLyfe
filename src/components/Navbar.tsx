@@ -3,7 +3,6 @@ import {
   MapPin,
   Search,
   Zap,
-  Stethoscope,
   ShoppingBag,
   Wallet,
   User as UserIcon,
@@ -90,13 +89,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="bg-white/20 hover:bg-white/30 text-white px-3 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
           >
             <Zap className="w-3 h-3 text-amber-300" /> Instant SOS Order
-          </button>
-          <button
-            id="api-docs-banner-btn"
-            onClick={onOpenAPIDocs}
-            className="underline hover:text-blue-200 text-[11px] cursor-pointer"
-          >
-            REST API & Postgres Docs
           </button>
         </div>
       </div>
@@ -206,16 +198,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Menu */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* AI Doctor Button */}
-            <button
-              id="ai-doctor-nav-btn"
-              onClick={onOpenAIDoctor}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-md shadow-blue-600/20 flex items-center gap-1.5 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Stethoscope className="w-4 h-4 text-yellow-300 animate-bounce" />
-              <span className="hidden md:inline">AI Doctor</span>
-            </button>
-
             {/* AI Voice Assistant Button */}
             {onOpenVoiceAssistant && (
               <button
@@ -227,12 +209,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden lg:inline">AI Voice</span>
               </button>
             )}
-
-            {/* Wallet Balance */}
-            <div className="hidden md:flex items-center bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl text-xs text-emerald-800 font-semibold gap-1">
-              <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>₹{walletBalance}</span>
-            </div>
 
             {/* Active Bookings Button */}
             <button

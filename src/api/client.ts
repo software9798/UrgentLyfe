@@ -47,7 +47,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     }
 
     endTimer({ status: 'SUCCESS', httpStatus: response.status });
-    return json.data as T;
+    return (json.data !== undefined ? json.data : json) as T;
   } catch (err: any) {
     endTimer({ status: 'ERROR', error: err.message });
     throw err;
@@ -235,7 +235,18 @@ export const api = {
     }),
 
   chatWithAI: (message: string) =>
-    fetchAPI<{ reply: string }>('/api/ai/chat', {
+    fetchAPI<{
+      reply: string;
+      issueDetected?: string;
+      recommendations?: Array<{
+        serviceId: string;
+        serviceTitle: string;
+        price: number;
+        estimatedDuration?: string;
+        whyThisService?: string;
+        isUrgentRecommended?: boolean;
+      }>;
+    }>('/api/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message }),
     }),
@@ -267,6 +278,10 @@ export const api = {
     }),
 
   getBIAnalytics: () => fetchAPI<any>('/api/analytics/business-intelligence'),
+
+  getProviderScore: (providerId: string) => fetchAPI<ProviderScore>(`/api/providers/${providerId}/score`),
+
+  getSentimentAnalytics: () => fetchAPI<any>('/api/admin/sentiment-analytics'),
 
   getAPIDocs: () => fetch('/api/docs').then((r) => r.json()),
 };

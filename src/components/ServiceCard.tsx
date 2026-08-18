@@ -79,6 +79,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
               <Clock className="w-2.5 h-2.5 text-slate-400" />
               {service.durationMinutes} mins
             </span>
+            <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200/80 px-1.5 py-0.5 rounded font-bold">
+              ★ 4.0 - 5.0 Rating Tiers
+            </span>
             {service.tags.map((tag) => (
               <span
                 key={tag}

@@ -102,13 +102,13 @@ export const AIDiagnosticModal: React.FC<AIDiagnosticModalProps> = ({
 
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-amber-500 flex items-center justify-center text-white shadow-md">
-              <Stethoscope className="w-5 h-5" />
+              <Wrench className="w-5 h-5" />
             </div>
             <div>
               <span className="text-[10px] bg-amber-400 text-slate-950 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                Google Gemini 3.6 Flash
+                Google Gemini AI Intelligence
               </span>
-              <h2 className="text-xl font-black">AI Repair Doctor & Diagnostic Wizard</h2>
+              <h2 className="text-xl font-black">AI Repair Diagnostic & Fix Estimator</h2>
             </div>
           </div>
           <p className="text-xs text-slate-300">

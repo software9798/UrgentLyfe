@@ -20,8 +20,11 @@ import {
   MessageSquare,
   Bot,
   Plus,
+  FileText,
+  Printer,
 } from 'lucide-react';
 import { Booking, UserProfile } from '../types';
+import { downloadInvoiceFile, openInvoicePrintWindow } from '../utils/invoiceGenerator';
 
 interface UserDashboardProps {
   bookings: Booking[];
@@ -31,6 +34,8 @@ interface UserDashboardProps {
   onQuickSOS: () => void;
   onOpenVoiceFeedback?: (booking: Booking) => void;
   onOpenAddressManager?: () => void;
+  onOpenPostServiceFeedback?: (booking: Booking) => void;
+  onViewInvoice?: (booking: Booking) => void;
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({
@@ -41,8 +46,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   onQuickSOS,
   onOpenVoiceFeedback,
   onOpenAddressManager,
+  onOpenPostServiceFeedback,
+  onViewInvoice,
 }) => {
   const [activeTab, setActiveTab] = useState<'bookings' | 'profile' | 'ai_history' | 'feedback'>('bookings');
+  const [downloadSuccessId, setDownloadSuccessId] = useState<string | null>(null);
+
+  const handleDownloadInvoice = (booking: Booking) => {
+    downloadInvoiceFile(booking);
+    setDownloadSuccessId(booking.id);
+    setTimeout(() => setDownloadSuccessId(null), 4000);
+  };
 
   // Profile Edit State
   const [profile, setProfile] = useState({
@@ -160,6 +174,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       {/* TAB 1: BOOKINGS & INVOICES */}
       {activeTab === 'bookings' && (
         <div className="space-y-6">
+          {downloadSuccessId && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold p-3 px-4 rounded-2xl flex items-center justify-between animate-fadeIn shadow-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>GST Tax Invoice for Booking #{downloadSuccessId} generated & downloaded successfully!</span>
+              </div>
+              <span className="text-[11px] text-emerald-700 font-semibold">Check Downloads folder ✓</span>
+            </div>
+          )}
           {/* Active Bookings Section */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -225,7 +248,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     )}
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-base font-black text-slate-900">₹{b.totalAmount}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-black text-slate-900">₹{b.totalAmount}</span>
+                        <button
+                          onClick={() => {
+                            if (onViewInvoice) {
+                              onViewInvoice(b);
+                            } else {
+                              handleDownloadInvoice(b);
+                            }
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                          title="View or Download Tax Invoice"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Invoice</span>
+                        </button>
+                      </div>
                       <button
                         onClick={() => onTrackBooking(b)}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
@@ -242,39 +281,101 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
 
           {/* Past Orders History */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-lg font-bold text-slate-900">Order History ({pastBookings.length})</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>Completed Orders & Voice Reviews ({pastBookings.length})</span>
+              </h2>
+              {pastBookings.length > 0 && onOpenVoiceFeedback && (
+                <button
+                  onClick={() => onOpenVoiceFeedback(pastBookings[0])}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Mic className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>Voice Feedback</span>
+                </button>
+              )}
+            </div>
+
             <div className="bg-white rounded-3xl border border-slate-200 divide-y divide-slate-100 shadow-xs">
               {pastBookings.map((b) => (
-                <div key={b.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      UL
+                <div key={b.id} className="p-4 sm:p-5 space-y-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        ✓
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">{b.service.title}</h3>
+                        <p className="text-xs text-slate-500">
+                          Completed on {new Date(b.createdAt).toLocaleDateString()} • Technician: {b.partner?.name || 'Verified Pro'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">{b.service.title}</h3>
-                      <p className="text-xs text-slate-500">
-                        Booked on {new Date(b.createdAt).toLocaleDateString()} • Status: {b.status}
-                      </p>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-900">
+                      <span className="text-sm font-black text-slate-900 mr-1">₹{b.totalAmount}</span>
+                      {onOpenPostServiceFeedback && (
+                        <button
+                          onClick={() => onOpenPostServiceFeedback(b)}
+                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <span>📸 Review & Photos</span>
+                        </button>
+                      )}
+                      {onOpenVoiceFeedback && (
+                        <button
+                          onClick={() => onOpenVoiceFeedback(b)}
+                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 font-extrabold ${
+                            b.voiceFeedbackText
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-slate-800 text-white shadow-xs hover:bg-slate-900'
+                          }`}
+                        >
+                          <Mic className="w-3.5 h-3.5 fill-current" />
+                          <span>{b.voiceFeedbackText ? 'Voice Review' : '🎙️ AI Voice Call'}</span>
+                        </button>
+                      )}
+                      <div className="inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                        <button
+                          onClick={() => handleDownloadInvoice(b)}
+                          className="hover:bg-white text-slate-700 font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs shadow-xs"
+                          title="Download GST Tax Invoice"
+                        >
+                          <Download className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Invoice</span>
+                        </button>
+                        {onViewInvoice && (
+                          <button
+                            onClick={() => onViewInvoice(b)}
+                            className="hover:bg-white text-slate-500 hover:text-slate-900 px-2 py-1 rounded-lg transition-all cursor-pointer text-xs"
+                            title="Preview Invoice"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <span>₹{b.totalAmount}</span>
-                    {onOpenVoiceFeedback && (
-                      <button
-                        onClick={() => onOpenVoiceFeedback(b)}
-                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Mic className="w-3.5 h-3.5 text-indigo-600" /> Voice Review
-                      </button>
-                    )}
-                    <button
-                      onClick={() => alert(`Downloading GST Invoice PDF for Booking ${b.id}...`)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Download className="w-3.5 h-3.5" /> GST Invoice
-                    </button>
-                  </div>
+                  {/* Recorded Voice Feedback Sentiment Card */}
+                  {b.voiceFeedbackText && (
+                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-emerald-900 flex items-center gap-1 text-[11px]">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>NLP Sentiment Score: {b.voiceFeedbackSentiment || 'POSITIVE'} ({b.voiceFeedbackRating || 5.0}★)</span>
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-medium">Provider score updated ✓</span>
+                      </div>
+                      <p className="text-slate-700 italic text-[11px]">"{b.voiceFeedbackText}"</p>
+                      {b.voiceFeedbackSummary && (
+                        <p className="text-[10px] font-semibold text-emerald-800">
+                          💡 Summary: {b.voiceFeedbackSummary}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

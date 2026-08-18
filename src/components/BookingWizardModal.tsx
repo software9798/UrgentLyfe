@@ -13,9 +13,13 @@ import {
   Loader2,
   ChevronRight,
   ChevronLeft,
+  Award,
+  Star,
 } from 'lucide-react';
-import { ServiceItem, AIDiagnosis, Booking, City } from '../types';
+import { ServiceItem, AIDiagnosis, Booking, City, ProviderTier, Partner } from '../types';
 import { api } from '../api/client';
+import { PARTNERS } from '../data/mockData';
+import { ProviderTierSelector, PROVIDER_TIERS } from './ProviderTierSelector';
 
 interface BookingWizardModalProps {
   isOpen: boolean;
@@ -41,6 +45,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   if (!isOpen || !service) return null;
 
   const [step, setStep] = useState<number>(1);
+  const [selectedProviderTier, setSelectedProviderTier] = useState<ProviderTier>('INTERMEDIATE');
+  const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
   const [isUrgent, setIsUrgent] = useState<boolean>(isUrgentDefault);
   const [scheduledDate, setScheduledDate] = useState<string>('Tomorrow');
   const [scheduledTimeSlot, setScheduledTimeSlot] = useState<string>('10:00 AM - 11:00 AM');
@@ -61,8 +67,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Price calculations
-  const subtotal = service.price;
+  // Price calculations based on selected provider rating tier
+  const tierInfo = PROVIDER_TIERS.find((t) => t.id === selectedProviderTier) || PROVIDER_TIERS[1];
+  const subtotal = Math.round(service.price * tierInfo.priceMultiplier);
   const urgentFee = isUrgent ? service.urgentFee : 0;
   const discountAmount = appliedDiscount || (couponCode ? Math.min(subtotal * 0.2, 200) : 0);
   const taxable = Math.max(0, subtotal + urgentFee - discountAmount);
@@ -93,6 +100,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         isUrgent,
         scheduledDate,
         scheduledTimeSlot,
+        providerTier: selectedProviderTier,
+        providerTierTitle: tierInfo.title,
+        partnerId: selectedPartner?.id,
+        partner: selectedPartner || undefined,
         userAddress: {
           line1: addressLine1,
           locality,
@@ -118,7 +129,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
         {/* Header */}
         <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
           <div>
@@ -130,7 +141,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             </div>
             <h2 className="text-base font-black text-white mt-1">
               {step === 1 && 'Service Address & Location'}
-              {step === 2 && 'Slot & Speed Selection'}
+              {step === 2 && 'Rating Tier & Technician Selection'}
               {step === 3 && 'Payment & Order Summary'}
             </h2>
           </div>
@@ -221,9 +232,20 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: Speed & Time Slot */}
+          {/* STEP 2: Rating Tier & Technician Selection */}
           {step === 2 && (
-            <div className="space-y-5">
+            <div className="space-y-6">
+              {/* Provider Rating Tier Selector */}
+              <ProviderTierSelector
+                service={service}
+                selectedTier={selectedProviderTier}
+                onSelectTier={setSelectedProviderTier}
+                availablePartners={PARTNERS}
+                selectedPartnerId={selectedPartner?.id}
+                onSelectPartner={(partner) => setSelectedPartner(partner)}
+                selectedCityName={selectedCity?.name}
+              />
+
               {/* Emergency SOS Toggle */}
               {service.isUrgentAvailable && (
                 <div
@@ -257,7 +279,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               )}
 
               {!isUrgent && (
-                <>
+                <div className="pt-2 border-t border-slate-100 space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
                       Select Date
@@ -304,7 +326,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       ))}
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           )}
@@ -312,6 +334,20 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           {/* STEP 3: Payment & Summary */}
           {step === 3 && (
             <div className="space-y-5">
+              {/* Selected Tier Confirmation Summary */}
+              <div className="bg-slate-900 text-white p-3.5 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <p className="font-bold text-white text-xs">{tierInfo.title} ({tierInfo.ratingBadge})</p>
+                    <p className="text-[10px] text-slate-300">{tierInfo.experienceText} • {tierInfo.badgeTag}</p>
+                  </div>
+                </div>
+                <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                  {selectedProviderTier} TIER
+                </span>
+              </div>
+
               {/* Coupon Code Input */}
               <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -374,7 +410,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   Payment Summary
                 </h4>
                 <div className="flex justify-between text-xs text-slate-300">
-                  <span>{service.title}</span>
+                  <span>{service.title} ({tierInfo.title})</span>
                   <span>₹{subtotal}</span>
                 </div>
                 {isUrgent && (

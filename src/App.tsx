@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
+import { LocationBarSection } from './components/LocationBarSection';
+import { FloatingAIAssistant } from './components/FloatingAIAssistant';
 import { CategoryGrid } from './components/CategoryGrid';
 import { ServiceCard } from './components/ServiceCard';
 import { ServiceDetailModal } from './components/ServiceDetailModal';
@@ -16,14 +18,16 @@ import { AddressManagerModal } from './components/AddressManagerModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { ProviderProfileModal } from './components/ProviderProfileModal';
 import { AIVoiceAssistantModal } from './components/AIVoiceAssistantModal';
+import { PostServiceFeedbackModal } from './components/PostServiceFeedbackModal';
+import { InvoiceModal } from './components/InvoiceModal';
 
 import { CITIES, CATEGORIES, SERVICES, PARTNERS, MOCK_BOOKINGS } from './data/mockData';
 import { City, Category, ServiceItem, Booking, AIDiagnosis, Partner, User, ProviderProfile, AuthResponse } from './types';
 import { api } from './api/client';
-import { Sparkles, Zap, Stethoscope, ShoppingBag, CheckCircle2, WifiOff } from 'lucide-react';
+import { Sparkles, Zap, Wrench, ShoppingBag, CheckCircle2, WifiOff } from 'lucide-react';
 
 export default function App() {
-  const [cities] = useState<City[]>(CITIES);
+  const [cities, setCities] = useState<City[]>(CITIES);
   const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]); // Bengaluru
   const [selectedLocality, setSelectedLocality] = useState<string>(CITIES[0].localities[0]);
 
@@ -41,6 +45,7 @@ export default function App() {
   const [isAddressesOpen, setIsAddressesOpen] = useState<boolean>(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState<boolean>(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState<boolean>(false);
+  const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null);
 
   const [selectedServiceDetail, setSelectedServiceDetail] = useState<ServiceItem | null>(null);
   const [isBookingWizardOpen, setIsBookingWizardOpen] = useState<boolean>(false);
@@ -51,6 +56,7 @@ export default function App() {
   // Bookings & Tracking
   const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS);
   const [activeLiveTrackingBooking, setActiveLiveTrackingBooking] = useState<Booking | null>(null);
+  const [feedbackTargetBooking, setFeedbackTargetBooking] = useState<Booking | null>(null);
 
   // AI Tools
   const [isAIDoctorOpen, setIsAIDoctorOpen] = useState<boolean>(false);
@@ -305,6 +311,8 @@ export default function App() {
             onOpenAIDoctor={() => setIsAIDoctorOpen(true)}
             onQuickSOS={handleQuickSOS}
             onOpenAddressManager={() => setIsAddressesOpen(true)}
+            onOpenPostServiceFeedback={(booking) => setFeedbackTargetBooking(booking)}
+            onViewInvoice={(booking) => setInvoiceBooking(booking)}
             onOpenVoiceFeedback={(booking) => {
               setVoiceFeedbackTargetBooking({
                 id: booking.id,
@@ -326,6 +334,16 @@ export default function App() {
               setIsAIDoctorOpen(true);
             }}
             onQuickSOS={handleQuickSOS}
+          />
+
+          {/* Location-Wise Service Booking & GPS Search Section */}
+          <LocationBarSection
+            cities={cities}
+            selectedCity={selectedCity}
+            onSelectCity={setSelectedCity}
+            selectedLocality={selectedLocality}
+            onSelectLocality={setSelectedLocality}
+            onAddCustomCity={(newCity) => setCities((prev) => [newCity, ...prev.filter((c) => c.id !== newCity.id)])}
           />
 
           <CategoryGrid
@@ -455,11 +473,48 @@ export default function App() {
         booking={activeLiveTrackingBooking}
         onClose={() => setActiveLiveTrackingBooking(null)}
         onCancelBooking={handleCancelBooking}
+        onOpenPostServiceFeedback={(b) => setFeedbackTargetBooking(b)}
+        onViewInvoice={(b) => setInvoiceBooking(b)}
+      />
+
+      <InvoiceModal
+        isOpen={!!invoiceBooking}
+        onClose={() => setInvoiceBooking(null)}
+        booking={invoiceBooking}
+        user={currentUser}
+      />
+
+      <PostServiceFeedbackModal
+        isOpen={!!feedbackTargetBooking}
+        booking={feedbackTargetBooking}
+        onClose={() => setFeedbackTargetBooking(null)}
+        onSubmitFeedback={(feedback) => {
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === feedback.bookingId
+                ? {
+                    ...b,
+                    userStarRating: feedback.rating,
+                    userReviewText: feedback.reviewText,
+                    workPhotos: feedback.photos,
+                  }
+                : b
+            )
+          );
+          showToast('🌟 Thank you! Feedback, photos & rating submitted successfully.');
+        }}
       />
 
       <AIChatDrawer
         isOpen={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
+        onBookService={(serviceId, isUrgent) => {
+          const srv = services.find((s) => s.id === serviceId) || services[0];
+          setBookingServiceTarget(srv);
+          setBookingIsUrgent(!!isUrgent);
+          setAiDiagnosisForBooking(null);
+          setIsBookingWizardOpen(true);
+        }}
       />
 
       <AIVoiceAssistantModal
@@ -469,6 +524,22 @@ export default function App() {
           setVoiceFeedbackTargetBooking(null);
         }}
         bookingForVoiceFeedback={voiceFeedbackTargetBooking}
+        onFeedbackSubmitted={({ bookingId, voiceFeedbackText, sentiment, rating, summary }) => {
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === bookingId
+                ? {
+                    ...b,
+                    voiceFeedbackText,
+                    voiceFeedbackSentiment: sentiment as any,
+                    voiceFeedbackRating: rating,
+                    voiceFeedbackSummary: summary,
+                    voiceFeedbackAt: new Date().toISOString(),
+                  }
+                : b
+            )
+          );
+        }}
         onBookService={(serviceId) => {
           const srv = services.find((s) => s.id === serviceId) || services[0];
           setBookingServiceTarget(srv);
@@ -483,6 +554,19 @@ export default function App() {
         onClose={() => setIsAPIDocsOpen(false)}
       />
 
+      {/* Left Corner Floating AI Assistant & Voice Assistant */}
+      <FloatingAIAssistant
+        onOpenAIChat={() => setIsAIChatOpen(true)}
+        onOpenAIVoice={() => {
+          setVoiceFeedbackTargetBooking(null);
+          setIsAIVoiceOpen(true);
+        }}
+        onOpenAIDoctor={() => {
+          setAiDoctorCategoryHint('');
+          setIsAIDoctorOpen(true);
+        }}
+      />
+
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 text-xs border-t border-slate-800 py-8 px-4 sm:px-8 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
@@ -491,9 +575,6 @@ export default function App() {
               UL
             </div>
             <span className="font-bold text-white text-sm">UrgentLyfe India</span>
-            <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-blue-400 font-bold">
-              PostgreSQL & JWT Auth
-            </span>
           </div>
 
           <p className="text-slate-500 text-[11px]">
@@ -501,9 +582,6 @@ export default function App() {
           </p>
 
           <div className="flex items-center gap-4 text-[11px]">
-            <button onClick={() => setIsAPIDocsOpen(true)} className="hover:text-blue-400 cursor-pointer">
-              REST API & DB Docs
-            </button>
             <button onClick={() => setIsAIChatOpen(true)} className="hover:text-blue-400 cursor-pointer">
               AI Assistant
             </button>

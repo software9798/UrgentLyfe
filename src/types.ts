@@ -1,4 +1,5 @@
 export type UserRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
+export type ProviderTier = 'JUNIOR' | 'INTERMEDIATE' | 'ADVANCED';
 
 export interface Address {
   id: string;
@@ -136,6 +137,8 @@ export interface Booking {
   scheduledTimeSlot: string; // e.g. '09:00 AM - 10:00 AM' or '30 Mins Express'
   status: BookingStatus;
   partner?: Partner;
+  providerTier?: 'JUNIOR' | 'INTERMEDIATE' | 'ADVANCED';
+  providerTierTitle?: string;
   subtotal: number;
   urgentFee: number;
   taxAmount: number;
@@ -149,6 +152,14 @@ export interface Booking {
   aiDiagnosis?: AIDiagnosis;
   etaMinutes?: number;
   otpCode?: string;
+  voiceFeedbackText?: string;
+  voiceFeedbackSentiment?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+  voiceFeedbackRating?: number;
+  voiceFeedbackSummary?: string;
+  voiceFeedbackAt?: string;
+  workPhotos?: string[];
+  userReviewText?: string;
+  userStarRating?: number;
 }
 
 export interface Review {
@@ -159,6 +170,7 @@ export interface Review {
   providerId: string;
   rating: number;
   comment: string;
+  workPhotos?: string[];
   createdAt: string;
 }
 
@@ -239,6 +251,9 @@ export interface ProviderScore {
   voiceFeedbackCount?: number;
   positiveSentimentPercentage?: number;
   rank?: number;
+  rankPosition?: string;
+  recentSentiments?: Array<{ text: string; sentiment: string; rating: number; date?: string }>;
+  aiSuggestions?: string[];
   updatedAt: string;
 }
 
@@ -284,6 +299,8 @@ export interface City {
   state: string;
   localities: string[];
   popular: boolean;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Coupon {

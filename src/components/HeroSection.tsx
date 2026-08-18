@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Zap, Stethoscope, Clock, Star, Award, Sparkles } from 'lucide-react';
+import { ShieldCheck, Zap, Wrench, Clock, Star, Award, Sparkles } from 'lucide-react';
 
 interface HeroSectionProps {
   onOpenAIDoctor: () => void;
@@ -43,8 +43,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             onClick={onOpenAIDoctor}
             className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold px-6 py-3.5 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center gap-2 text-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
-            <Stethoscope className="w-5 h-5 text-amber-300" />
-            <span>Diagnose Issue with AI Doctor</span>
+            <Wrench className="w-5 h-5 text-amber-300" />
+            <span>Instant AI Fault Diagnostic</span>
           </button>
 
           <button
