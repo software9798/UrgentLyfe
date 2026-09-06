@@ -315,21 +315,68 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  chatWithAI: (message: string) =>
+  chatWithAI: (
+    message: string,
+    history?: Array<{ sender: 'user' | 'ai'; text: string }>,
+    languagePreference?: string,
+    imageBase64?: string,
+    imageMimeType?: string
+  ) =>
     fetchAPI<{
       reply: string;
+      detectedEmotion?: string;
+      emotionEmoji?: string;
+      empathyNote?: string;
+      detectedLanguage?: string;
       issueDetected?: string;
+      severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL_SOS';
+      immediateSafetyTip?: string;
+      whyThisHappened?: string;
+      resolutionPlan?: string;
+      suggestedFollowUps?: string[];
+      sentiment?: {
+        polarity: 'NEGATIVE' | 'NEUTRAL' | 'POSITIVE';
+        score: number;
+        intent: string;
+        toneApplied: string;
+        urgencyLevel: 'CRITICAL_SOS' | 'HIGH' | 'MEDIUM' | 'LOW';
+        explanation?: string;
+      };
+      tailoredReasoning?: string;
       recommendations?: Array<{
         serviceId: string;
         serviceTitle: string;
         price: number;
+        originalPrice?: number;
+        discountPercent?: number;
         estimatedDuration?: string;
         whyThisService?: string;
         isUrgentRecommended?: boolean;
+        tags?: string[];
       }>;
     }>('/api/ai/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, history, languagePreference, imageBase64, imageMimeType }),
+    }),
+
+  analyzeSentiment: (text: string, context?: string) =>
+    fetchAPI<{
+      sentiment: {
+        polarity: 'NEGATIVE' | 'NEUTRAL' | 'POSITIVE';
+        score: number;
+        intent: string;
+        toneApplied: string;
+        urgencyLevel: string;
+        explanation?: string;
+      };
+      detectedEmotion: string;
+      emotionEmoji: string;
+      recommendedTone: string;
+      tailoredReasoning: string;
+      suggestedActions: string[];
+    }>('/api/ai/sentiment', {
+      method: 'POST',
+      body: JSON.stringify({ text, context }),
     }),
 
   sendVoiceQuery: (data: { transcript: string; language?: string; userId?: string }) =>
