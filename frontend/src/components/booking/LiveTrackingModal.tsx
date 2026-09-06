@@ -145,7 +145,9 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
           </div>
           <h2 className="text-lg font-black text-white mt-1">{booking.service.title}</h2>
           <p className="text-xs text-slate-300">
-            {booking.isUrgent ? '30-Minute Emergency SOS Priority Order' : `Scheduled Slot: ${booking.scheduledTimeSlot}`}
+            {booking.isUrgent
+              ? '30-Minute Emergency SOS Priority Order'
+              : `Scheduled Slot: ${booking.scheduledTimeSlot}`}
           </p>
         </div>
 
@@ -258,7 +260,14 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
 
           {/* Status Timeline */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Status Progress</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Status Progress</h4>
+              {booking.status === 'CANCELLED' && (
+                <span className="text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
+                  Status: CANCELLED (Not Completed)
+                </span>
+              )}
+            </div>
             <div className="space-y-2">
               {steps.map((step, idx) => {
                 const isPassed = idx <= (currentStepIndex >= 0 ? currentStepIndex : 1);
