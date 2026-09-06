@@ -396,7 +396,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Completed Orders & Voice Reviews ({pastBookings.length})</span>
+                <span>Past Orders & Invoices ({pastBookings.length})</span>
               </h2>
               {pastBookings.length > 0 && onOpenVoiceFeedback && (
                 <button
@@ -409,88 +409,94 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               )}
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 divide-y divide-slate-100 shadow-xs">
-              {pastBookings.map((b) => (
-                <div key={b.id} className="p-4 sm:p-5 space-y-3">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
-                        ✓
+            {pastBookings.length === 0 ? (
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
+                No past bookings found. Once services are completed, official GST invoices will appear here.
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-200 divide-y divide-slate-100 shadow-xs">
+                {pastBookings.map((b) => (
+                  <div key={b.id} className="p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          ✓
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">{b.service.title}</h3>
+                          <p className="text-xs text-slate-500">
+                            Completed on {new Date(b.createdAt).toLocaleDateString()} • Technician: {b.partner?.name || 'Verified Pro'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">{b.service.title}</h3>
-                        <p className="text-xs text-slate-500">
-                          Completed on {new Date(b.createdAt).toLocaleDateString()} • Technician: {b.partner?.name || 'Verified Pro'}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-900">
-                      <span className="text-sm font-black text-slate-900 mr-1">₹{b.totalAmount}</span>
-                      {onOpenPostServiceFeedback && (
-                        <button
-                          onClick={() => onOpenPostServiceFeedback(b)}
-                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <span>📸 Review & Photos</span>
-                        </button>
-                      )}
-                      {onOpenVoiceFeedback && (
-                        <button
-                          onClick={() => onOpenVoiceFeedback(b)}
-                          className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 font-extrabold ${
-                            b.voiceFeedbackText
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-slate-800 text-white shadow-xs hover:bg-slate-900'
-                          }`}
-                        >
-                          <Mic className="w-3.5 h-3.5 fill-current" />
-                          <span>{b.voiceFeedbackText ? 'Voice Review' : '🎙️ AI Voice Call'}</span>
-                        </button>
-                      )}
-                      <div className="inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200">
-                        <button
-                          onClick={() => handleDownloadInvoice(b)}
-                          className="hover:bg-white text-slate-700 font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs shadow-xs"
-                          title="Download GST Tax Invoice"
-                        >
-                          <Download className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Invoice</span>
-                        </button>
-                        {onViewInvoice && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-900">
+                        <span className="text-sm font-black text-slate-900 mr-1">₹{b.totalAmount}</span>
+                        {onOpenPostServiceFeedback && (
                           <button
-                            onClick={() => onViewInvoice(b)}
-                            className="hover:bg-white text-slate-500 hover:text-slate-900 px-2 py-1 rounded-lg transition-all cursor-pointer text-xs"
-                            title="Preview Invoice"
+                            onClick={() => onOpenPostServiceFeedback(b)}
+                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <span>📸 Review & Photos</span>
                           </button>
                         )}
+                        {onOpenVoiceFeedback && (
+                          <button
+                            onClick={() => onOpenVoiceFeedback(b)}
+                            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 font-extrabold ${
+                              b.voiceFeedbackText
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-slate-800 text-white shadow-xs hover:bg-slate-900'
+                            }`}
+                          >
+                            <Mic className="w-3.5 h-3.5 fill-current" />
+                            <span>{b.voiceFeedbackText ? 'Voice Review' : '🎙️ AI Voice Call'}</span>
+                          </button>
+                        )}
+                        <div className="inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                          <button
+                            onClick={() => handleDownloadInvoice(b)}
+                            className="hover:bg-white text-slate-700 font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs shadow-xs"
+                            title="Download GST Tax Invoice"
+                          >
+                            <Download className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Invoice</span>
+                          </button>
+                          {onViewInvoice && (
+                            <button
+                              onClick={() => onViewInvoice(b)}
+                              className="hover:bg-white text-slate-500 hover:text-slate-900 px-2 py-1 rounded-lg transition-all cursor-pointer text-xs"
+                              title="Preview Invoice"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Recorded Voice Feedback Sentiment Card */}
-                  {b.voiceFeedbackText && (
-                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-emerald-900 flex items-center gap-1 text-[11px]">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>NLP Sentiment Score: {b.voiceFeedbackSentiment || 'POSITIVE'} ({b.voiceFeedbackRating || 5.0}★)</span>
-                        </span>
-                        <span className="text-[10px] text-emerald-700 font-medium">Provider score updated ✓</span>
+                    {/* Recorded Voice Feedback Sentiment Card */}
+                    {b.voiceFeedbackText && (
+                      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-emerald-900 flex items-center gap-1 text-[11px]">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>NLP Sentiment Score: {b.voiceFeedbackSentiment || 'POSITIVE'} ({b.voiceFeedbackRating || 5.0}★)</span>
+                          </span>
+                          <span className="text-[10px] text-emerald-700 font-medium">Provider score updated ✓</span>
+                        </div>
+                        <p className="text-slate-700 italic text-[11px]">"{b.voiceFeedbackText}"</p>
+                        {b.voiceFeedbackSummary && (
+                          <p className="text-[10px] font-semibold text-emerald-800">
+                            💡 Summary: {b.voiceFeedbackSummary}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-slate-700 italic text-[11px]">"{b.voiceFeedbackText}"</p>
-                      {b.voiceFeedbackSummary && (
-                        <p className="text-[10px] font-semibold text-emerald-800">
-                          💡 Summary: {b.voiceFeedbackSummary}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
